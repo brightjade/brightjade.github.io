@@ -4,4 +4,4 @@ title: About
 permalink: /about/
 ---
 
-Introduce yourself here... so people will know who you are and what you do.. blah..blah..blah..
+Hi, this is Minseok! I'm currently a first-year master's student @ [KAIST AI](http://gsai.kaist.ac.kr/){:target="_blank"}. I will be posting my NLP notes here, so stay tuned!
