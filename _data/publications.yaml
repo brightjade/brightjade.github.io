@@ -1,0 +1,56 @@
+papers:
+
+  - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
+    authors: "<b>Minseok Choi</b>, Kyunghyun Min, Jaegul Choo"
+    venue: "Preprint"
+    paper_pdf: "https://arxiv.org/abs/2406.12354"
+    code: "https://github.com/brightjade/multilingual-unlearning"
+    selected: y
+
+  - title: "SNAP: Unlearning Selective Knowledge in Large Language Models with Negative Instructions"
+    authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
+    venue: "Preprint"
+    paper_pdf: "https://arxiv.org/abs/2406.12329"
+    code: "https://github.com/brightjade/snap-unlearning"
+    selected: y
+
+  - title: "PairEval: Open-domain Dialogue Evaluation with Pairwise Comparison"
+    authors: "ChaeHun Park, <b>Minseok Choi</b>, Dohyun Lee, Jaegul Choo"
+    venue: "Preprint"
+    paper_pdf: "https://arxiv.org/abs/2404.01015"
+    code: "https://github.com/ddehun/PairEval"
+    selected: y
+
+  - title: "Protecting Privacy Through Approximating Optimal Parameters for Sequence Unlearning in Language Models"
+    authors: "Dohyun Lee*, Daniel Rim*, <b>Minseok Choi</b>, and Jaegul Choo"
+    venue: "ACL 2024 Findings"
+    selected: y
+
+  - title: "SimCKP: Simple Contrastive Learning of Keyphrase Representations"
+    authors: "<b>Minseok Choi</b>, Chaeheon Gwak, Seho Kim, Si hyeong Kim, Jaegul Choo"
+    venue: "EMNLP 2023 Findings"
+    paper_pdf: "https://aclanthology.org/2023.findings-emnlp.199/"
+    code: "https://github.com/brightjade/SimCKP"
+    selected: y
+
+  - title: "PRiSM: Enhancing Low-Resource Document-Level Relation Extraction with Relation-Aware Score Calibration"
+    authors: "<b>Minseok Choi</b>, Hyesu Lim, Jaegul Choo"
+    venue: "IJCNLP-AACL 2023 Findings"
+    paper_pdf: "https://aclanthology.org/2023.findings-ijcnlp.4/"
+    code: "https://github.com/brightjade/PRiSM"
+    selected: y
+
+  - title: "HistRED: A Historical Document-Level Relation Extraction Dataset"
+    authors: "Soyoung Yang, <b>Minseok Choi</b>, Jaegul Choo"
+    venue: "ACL 2023"
+    paper_pdf: "https://aclanthology.org/2023.acl-long.180/"
+    code: "https://github.com/dudrrm/HistRED"
+    data: "https://huggingface.co/datasets/Soyoung/HistRED"
+    selected: y
+
+  - title: "Rethinking Style Transformer by Energy-based Interpretation: Adversarial Unsupervised Style Transfer using a Pretrained Model"
+    authors: "Hojun Cho, Dohee Kim, Seungwoo Ryu, ChaeHun Park, Hyungjong Noh, Jeong-in Hwang, <b>Minseok Choi</b>, Edward Choi, Jaegul Choo"
+    venue: "EMNLP 2022"
+    paper_pdf: "https://aclanthology.org/2022.emnlp-main.366/"
+    code: "https://github.com/HojunCho/StyleBART"
+    selected: y

@@ -1,0 +1,25 @@
+experiences:
+
+- place: "Republic of Korea Army"
+  time: "Mar 2023 - Present"
+  title: "Technical Research Personnel"
+  subtitle: "Compulsory military service"
+  category: "work"
+
+- place: "Naver Webtoon"
+  time: "Jan-Jun 2022"
+  title: "Research Intern"
+  subtitle: "Keyphrase Prediction"
+  category: "work"
+
+- place: "KAIST"
+  time: "Mar 2020 - Present"
+  title: "M.S.-Ph.D. Integrated Student (Advisor: Jaegul Choo)"
+  subtitle: "Data and Visual Analytics Lab"
+  category: "school"
+
+- place: "University of Illinois at Urbana-Champaign"
+  time: "Sep 2017 - May 2019"
+  title: "B.S. in Computer Science"
+  subtitle: "with Honors"
+  category: "school"
