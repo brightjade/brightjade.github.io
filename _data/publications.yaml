@@ -24,6 +24,7 @@ papers:
   - title: "Protecting Privacy Through Approximating Optimal Parameters for Sequence Unlearning in Language Models"
     authors: "Dohyun Lee*, Daniel Rim*, <b>Minseok Choi</b>, and Jaegul Choo"
     venue: "ACL 2024 Findings"
+    paper_pdf: "https://arxiv.org/abs/2406.14091"
     selected: y
 
   - title: "SimCKP: Simple Contrastive Learning of Keyphrase Representations"

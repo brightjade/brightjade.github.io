@@ -9,10 +9,18 @@ h4 {
 .main-description h1 {
   margin-bottom: 0px; }
 .main-description p {
+  text-align: left;
   margin-bottom: 0px; }
 .main-description .fa {
+  vertical-align: middle;
   font-size: 22px;
-  margin-top: 5px; }
+  margin-top: 5px;
+}
+.main-description .fa-brands {
+  vertical-align: middle;
+  font-size: 22px;
+  margin-top: 5px;
+}
 .paper {
   margin-bottom: 20px }
 .paper .title {
