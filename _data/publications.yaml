@@ -16,7 +16,7 @@ papers:
 
   - title: "PairEval: Open-domain Dialogue Evaluation with Pairwise Comparison"
     authors: "ChaeHun Park, <b>Minseok Choi</b>, Dohyun Lee, Jaegul Choo"
-    venue: "Preprint"
+    venue: "COLM 2024"
     paper_pdf: "https://arxiv.org/abs/2404.01015"
     code: "https://github.com/ddehun/PairEval"
     selected: y
