@@ -22,7 +22,7 @@ papers:
     selected: y
 
   - title: "Protecting Privacy Through Approximating Optimal Parameters for Sequence Unlearning in Language Models"
-    authors: "Dohyun Lee*, Daniel Rim*, <b>Minseok Choi</b>, and Jaegul Choo"
+    authors: "Dohyun Lee*, Daniel Rim*, <b>Minseok Choi</b>, Jaegul Choo"
     venue: "ACL 2024 Findings"
     paper_pdf: "https://arxiv.org/abs/2406.14091"
     selected: y
@@ -42,7 +42,7 @@ papers:
     selected: y
 
   - title: "HistRED: A Historical Document-Level Relation Extraction Dataset"
-    authors: "Soyoung Yang, <b>Minseok Choi</b>, Jaegul Choo"
+    authors: "Soyoung Yang, <b>Minseok Choi</b>, Youngwoo Cho, Jaegul Choo"
     venue: "ACL 2023"
     paper_pdf: "https://aclanthology.org/2023.acl-long.180/"
     code: "https://github.com/dudrrm/HistRED"
