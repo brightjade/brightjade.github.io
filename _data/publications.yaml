@@ -2,7 +2,7 @@ papers:
 
   - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
     authors: "<b>Minseok Choi</b>, Kyunghyun Min, Jaegul Choo"
-    venue: "Preprint"
+    venue: "EMNLP 2024 Findings"
     paper_pdf: "https://arxiv.org/abs/2406.12354"
     code: "https://github.com/brightjade/multilingual-unlearning"
     selected: y
