@@ -1,5 +1,12 @@
 papers:
 
+  - title: "Breaking Chains: Unraveling the Links in Multi-Hop Knowledge Unlearning"
+    authors: "<b>Minseok Choi</b>, ChaeHun Park, Dohyun Lee, Jaegul Choo"
+    venue: "Preprint"
+    paper_pdf: "https://arxiv.org/abs/2410.13274"
+    code: "https://github.com/brightjade/Munch"
+    selected: y
+
   - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
     authors: "<b>Minseok Choi</b>, Kyunghyun Min, Jaegul Choo"
     venue: "EMNLP 2024 Findings"
@@ -24,7 +31,7 @@ papers:
   - title: "Protecting Privacy Through Approximating Optimal Parameters for Sequence Unlearning in Language Models"
     authors: "Dohyun Lee*, Daniel Rim*, <b>Minseok Choi</b>, Jaegul Choo"
     venue: "ACL 2024 Findings"
-    paper_pdf: "https://arxiv.org/abs/2406.14091"
+    paper_pdf: "https://aclanthology.org/2024.findings-acl.936/"
     selected: y
 
   - title: "SimCKP: Simple Contrastive Learning of Keyphrase Representations"
