@@ -7,18 +7,18 @@ papers:
     code: "https://github.com/brightjade/Munch"
     selected: y
 
-  - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
-    authors: "<b>Minseok Choi</b>, Kyunghyun Min, Jaegul Choo"
-    venue: "EMNLP 2024 Findings"
-    paper_pdf: "https://arxiv.org/abs/2406.12354"
-    code: "https://github.com/brightjade/multilingual-unlearning"
-    selected: y
-
   - title: "SNAP: Unlearning Selective Knowledge in Large Language Models with Negative Instructions"
     authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
     venue: "Preprint"
     paper_pdf: "https://arxiv.org/abs/2406.12329"
     code: "https://github.com/brightjade/snap-unlearning"
+    selected: y
+
+  - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
+    authors: "<b>Minseok Choi</b>, Kyunghyun Min, Jaegul Choo"
+    venue: "EMNLP 2024 Findings"
+    paper_pdf: "https://arxiv.org/abs/2406.12354"
+    code: "https://github.com/brightjade/multilingual-unlearning"
     selected: y
 
   - title: "PairEval: Open-domain Dialogue Evaluation with Pairwise Comparison"
