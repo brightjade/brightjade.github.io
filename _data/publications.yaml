@@ -7,11 +7,11 @@ papers:
     code: "https://github.com/brightjade/Munch"
     selected: y
 
-  - title: "SNAP: Unlearning Selective Knowledge in Large Language Models with Negative Instructions"
+  - title: "Opt-Out: Investigating Entity-Level Unlearning for Large Language Models via Optimal Transport"
     authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
     venue: "Preprint"
     paper_pdf: "https://arxiv.org/abs/2406.12329"
-    code: "https://github.com/brightjade/snap-unlearning"
+    code: "https://github.com/brightjade/Opt-Out"
     selected: y
 
   - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
@@ -61,4 +61,10 @@ papers:
     venue: "EMNLP 2022"
     paper_pdf: "https://aclanthology.org/2022.emnlp-main.366/"
     code: "https://github.com/HojunCho/StyleBART"
+    selected: y
+
+  - title: "Development and Application of Web‑based Machine Learning Program for Automated Assessment Model Generation"
+    authors: "<b>Minseok Choi</b>, Jaegul Choo, Minsu Ha"
+    venue: "Brain, Digital, & Learning, Vol. 12, No. 4, pp. 567-578, 2022"
+    paper_pdf: "https://web.archive.org/web/20230114040140id_/http://www.braindigitallearning.org/view/N0230120401.pdf"
     selected: y
