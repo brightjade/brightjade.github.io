@@ -9,7 +9,7 @@ papers:
 
   - title: "Opt-Out: Investigating Entity-Level Unlearning for Large Language Models via Optimal Transport"
     authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
-    venue: "Preprint"
+    venue: "ACL 2025"
     paper_pdf: "https://arxiv.org/abs/2406.12329"
     code: "https://github.com/brightjade/Opt-Out"
     selected: y
