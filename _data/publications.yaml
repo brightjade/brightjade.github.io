@@ -1,5 +1,13 @@
 papers:
 
+  - title: "ExpGuard: LLM Content Moderation in Specialized Domains"
+    authors: "<b>Minseok Choi</b>*, Dongjin Kim*, Seungbin Yang*, Subin Kim, Youngjun Kwak, Juyoung Oh, Jaegul Choo, Jungmin Son"
+    venue: "ICLR 2026"
+    paper_pdf: "https://openreview.net/forum?id=t5cYJlV6aJ"
+    code: "https://github.com/brightjade/ExpGuard"
+    data: "https://huggingface.co/datasets/6rightjade/expguardmix"
+    selected: y
+
   - title: "Breaking Chains: Unraveling the Links in Multi-Hop Knowledge Unlearning"
     authors: "<b>Minseok Choi</b>, ChaeHun Park, Dohyun Lee, Jaegul Choo"
     venue: "Preprint"
@@ -12,6 +20,7 @@ papers:
     venue: "ACL 2025"
     paper_pdf: "https://aclanthology.org/2025.acl-long.1371/"
     code: "https://github.com/brightjade/Opt-Out"
+    data: "https://huggingface.co/datasets/6rightjade/ELUDe"
     selected: y
 
   - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
