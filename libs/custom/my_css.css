@@ -28,14 +28,71 @@ h4 {
 .paper p {
   margin-bottom: 2px }
 .paper-buttons {
-  margin-top: 5px }
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px; }
 .paper .button {
-  display: inline-block;
-  height: 25px;
-  padding: 0 25px;
-  font-weight: 100;
-  line-height: 25px;
-  text-transform: none; }
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 12px;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 26px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-bottom: 0;
+  border: none;
+  border-radius: 50px;
+  transition: background-color 0.2s ease, color 0.2s ease; }
+.paper .button:hover,
+.paper .button:focus {
+  border: none;
+  outline: 0; }
+.paper .button i {
+  font-size: 14px; }
+.paper .button .icon-hf {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle; }
+.paper .btn-paper {
+  background-color: #eef2ff;
+  color: #4338ca; }
+.paper .btn-paper:hover {
+  background-color: #dbeafe;
+  color: #3730a3; }
+.paper .btn-code {
+  background-color: #f3f4f6;
+  color: #1f2937; }
+.paper .btn-code:hover {
+  background-color: #e5e7eb;
+  color: #111827; }
+.paper .btn-data {
+  background-color: #fff7ed;
+  color: #c2410c; }
+.paper .btn-data:hover {
+  background-color: #ffedd5;
+  color: #9a3412; }
+.paper .btn-slides {
+  background-color: #ecfdf5;
+  color: #065f46; }
+.paper .btn-slides:hover {
+  background-color: #d1fae5;
+  color: #064e3b; }
+.paper .btn-poster {
+  background-color: #faf5ff;
+  color: #7c3aed; }
+.paper .btn-poster:hover {
+  background-color: #ede9fe;
+  color: #6d28d9; }
+.paper .btn-video {
+  background-color: #fef2f2;
+  color: #dc2626; }
+.paper .btn-video:hover {
+  background-color: #fee2e2;
+  color: #b91c1c; }
 .section-header {
   text-transform: uppercase;
   font-size: 1.5rem;

@@ -95,27 +95,27 @@ title: Home
           <p><i>{{ paper.venue }}</i></p>
            <div class="paper-buttons">
             {% if paper.paper_pdf %}
-              <a class="button" href="{{ paper.paper_pdf | prepend: site.baseurl }}" target="_blank">Paper</a>
+              <a class="button btn-paper" href="{{ paper.paper_pdf | prepend: site.baseurl }}" target="_blank"><i class="fa fa-file-text-o"></i> Paper</a>
             {% endif %}
 
             {% if paper.slides %}
-              <a class="button" href="{{ paper.slides | prepend: site.baseurl }}" target="_blank">Slides</a>
+              <a class="button btn-slides" href="{{ paper.slides | prepend: site.baseurl }}" target="_blank"><i class="fa fa-file-powerpoint-o"></i> Slides</a>
             {% endif %}
 
             {% if paper.poster %}
-              <a class="button" href="{{ paper.poster | prepend: site.baseurl }}" target="_blank">Poster</a>
+              <a class="button btn-poster" href="{{ paper.poster | prepend: site.baseurl }}" target="_blank"><i class="fa fa-image"></i> Poster</a>
             {% endif %}
 
             {% if paper.video %}
-              <a class="button" href="{{ paper.video }}" target="_blank">Video</a>
+              <a class="button btn-video" href="{{ paper.video }}" target="_blank"><i class="fa fa-play-circle"></i> Video</a>
             {% endif %}
 
             {% if paper.code %}
-              <a class="button" href="{{ paper.code }}" target="_blank">Code</a>
+              <a class="button btn-code" href="{{ paper.code }}" target="_blank"><i class="fa fa-github"></i> Code</a>
             {% endif %}
 
             {% if paper.data %}
-              <a class="button" href="{{ paper.data }}" target="_blank">Data</a>
+              <a class="button btn-data" href="{{ paper.data }}" target="_blank"><img class="icon-hf" src="{{ '/assets/icons/huggingface.svg' | prepend: site.baseurl }}" alt="HuggingFace"> Data</a>
             {% endif %}
 
           </div>
@@ -131,27 +131,27 @@ title: Home
           <p><i>{{ paper.venue }}</i></p>
            <div class="paper-buttons">
             {% if paper.paper_pdf %}
-              <a class="button" href="{{ paper.paper_pdf | prepend: site.baseurl }}" target="_blank">Paper</a>
+              <a class="button btn-paper" href="{{ paper.paper_pdf | prepend: site.baseurl }}" target="_blank"><i class="fa fa-file-text-o"></i> Paper</a>
             {% endif %}
 
             {% if paper.slides %}
-              <a class="button" href="{{ paper.slides | prepend: site.baseurl }}" target="_blank">Slides</a>
+              <a class="button btn-slides" href="{{ paper.slides | prepend: site.baseurl }}" target="_blank"><i class="fa fa-file-powerpoint-o"></i> Slides</a>
             {% endif %}
 
             {% if paper.poster %}
-              <a class="button" href="{{ paper.poster | prepend: site.baseurl }}" target="_blank">Poster</a>
+              <a class="button btn-poster" href="{{ paper.poster | prepend: site.baseurl }}" target="_blank"><i class="fa fa-image"></i> Poster</a>
             {% endif %}
 
             {% if paper.video %}
-              <a class="button" href="{{ paper.video }}" target="_blank">Video</a>
+              <a class="button btn-video" href="{{ paper.video }}" target="_blank"><i class="fa fa-play-circle"></i> Video</a>
             {% endif %}
 
             {% if paper.code %}
-              <a class="button" href="{{ paper.code }}" target="_blank">Code</a>
+              <a class="button btn-code" href="{{ paper.code }}" target="_blank"><i class="fa fa-github"></i> Code</a>
             {% endif %}
 
             {% if paper.data %}
-              <a class="button" href="{{ paper.data }}" target="_blank">Data</a>
+              <a class="button btn-data" href="{{ paper.data }}" target="_blank"><img class="icon-hf" src="{{ '/assets/icons/huggingface.svg' | prepend: site.baseurl }}" alt="HuggingFace"> Data</a>
             {% endif %}
 
           </div>
