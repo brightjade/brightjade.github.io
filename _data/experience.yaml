@@ -3,7 +3,7 @@ experiences:
 - place: "KAIST"
   time: "Mar 2026 - Present"
   title: "Postdoctoral Fellow"
-  subtitle: "Information & Electronics Research Institute"
+  subtitle: "Information & Electronics Research Institute<details class='trp-fold'><summary>Concurrent military service (Mar 2023 - Present)</summary><div class='trp-fold-body'>Technical Research Personnel &mdash; Korea's alternative military service program for STEM researchers. Recent regulations require the final year to be completed post-PhD.</div></details>"
   category: "school"
 
 - place: "Krafton"
@@ -11,12 +11,6 @@ experiences:
   title: "Applied Research Intern"
   subtitle: "<span style='color: #FF6347;'>[May-Nov 2025]</span> <a href='https://youtu.be/OdtFL1CDDwc?si=qUng2jqBife7mYw1' target='_blank'>PUBG Ally</a><br/><span style='color: #FF6347;'>[Dec 2025-Feb 2026]</span> Coding Agent"
   category: "work"
-
-- place: "Republic of Korea Army"
-  time: "Mar 2023 - Present"
-  title: "Technical Research Personnel"
-  subtitle: "Compulsory military service"
-  category: "school"
 
 - place: "Naver Webtoon"
   time: "Jan-Jun 2022"
