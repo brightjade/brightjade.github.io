@@ -18,7 +18,6 @@ papers:
     authors: "<b>Minseok Choi</b>, ChaeHun Park, Dohyun Lee, Jaegul Choo"
     venue: "Preprint"
     paper_pdf: "https://arxiv.org/abs/2410.13274"
-    code: "https://github.com/brightjade/Munch"
     selected: y
 
   - title: "Opt-Out: Investigating Entity-Level Unlearning for Large Language Models via Optimal Transport"
