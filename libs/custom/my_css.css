@@ -27,6 +27,13 @@ h4 {
   /*text-transform: uppercase; */}
 .paper p {
   margin-bottom: 2px }
+.paper .acceptance-rate {
+  font-size: 90%;
+  color: #777; }
+.paper .acceptance-rate::before {
+  content: "\00b7";
+  margin: 0 0.45em;
+  color: #aaa; }
 .paper-buttons {
   margin-top: 8px;
   display: flex;
