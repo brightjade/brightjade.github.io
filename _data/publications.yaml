@@ -14,18 +14,18 @@ papers:
     data: "https://huggingface.co/datasets/6rightjade/expguardmix"
     selected: y
 
-  - title: "Breaking Chains: Unraveling the Links in Multi-Hop Knowledge Unlearning"
-    authors: "<b>Minseok Choi</b>, ChaeHun Park, Dohyun Lee, Jaegul Choo"
-    venue: "Preprint"
-    paper_pdf: "https://arxiv.org/abs/2410.13274"
-    selected: y
-
   - title: "Opt-Out: Investigating Entity-Level Unlearning for Large Language Models via Optimal Transport"
     authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
     venue: "ACL 2025"
     paper_pdf: "https://aclanthology.org/2025.acl-long.1371/"
     code: "https://github.com/brightjade/Opt-Out"
     data: "https://huggingface.co/datasets/6rightjade/ELUDe"
+    selected: y
+
+  - title: "Breaking Chains: Unraveling the Links in Multi-Hop Knowledge Unlearning"
+    authors: "<b>Minseok Choi</b>, ChaeHun Park, Dohyun Lee, Jaegul Choo"
+    venue: "arXiv Preprint 2024"
+    paper_pdf: "https://arxiv.org/abs/2410.13274"
     selected: y
 
   - title: "Cross-Lingual Unlearning of Selective Knowledge in Multilingual Language Models"
