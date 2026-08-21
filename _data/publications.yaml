@@ -2,7 +2,7 @@ papers:
 
   - title: "Membrane: A Self-Evolving Contrastive Safety Memory for LLM Agent Defense"
     authors: "<b>Minseok Choi</b>*, Seungbin Yang*, Dongjin Kim*, Subin Kim, Jungmin Son, Yunseung Lee, Jaegul Choo, Youngjun Kwak"
-    venue: "Preprint"
+    venue: "EMNLP 2026"
     paper_pdf: "https://arxiv.org/abs/2606.05743"
     selected: y
 
