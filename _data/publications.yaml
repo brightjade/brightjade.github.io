@@ -3,12 +3,14 @@ papers:
   - title: "Membrane: A Self-Evolving Contrastive Safety Memory for LLM Agent Defense"
     authors: "<b>Minseok Choi</b>*, Seungbin Yang*, Dongjin Kim*, Subin Kim, Jungmin Son, Yunseung Lee, Jaegul Choo, Youngjun Kwak"
     venue: "EMNLP 2026"
+    acceptance_rate: "15.4%"
     paper_pdf: "https://arxiv.org/abs/2606.05743"
     selected: y
 
   - title: "ExpGuard: LLM Content Moderation in Specialized Domains"
     authors: "<b>Minseok Choi</b>*, Dongjin Kim*, Seungbin Yang*, Subin Kim, Youngjun Kwak, Juyoung Oh, Jaegul Choo, Jungmin Son"
     venue: "ICLR 2026"
+    acceptance_rate: "27.4%"
     paper_pdf: "https://openreview.net/forum?id=t5cYJlV6aJ"
     code: "https://github.com/brightjade/ExpGuard"
     data: "https://huggingface.co/datasets/6rightjade/expguardmix"
@@ -17,6 +19,7 @@ papers:
   - title: "Opt-Out: Investigating Entity-Level Unlearning for Large Language Models via Optimal Transport"
     authors: "<b>Minseok Choi</b>, Daniel Rim, Dohyun Lee, Jaegul Choo"
     venue: "ACL 2025"
+    acceptance_rate: "20.3%"
     paper_pdf: "https://aclanthology.org/2025.acl-long.1371/"
     code: "https://github.com/brightjade/Opt-Out"
     data: "https://huggingface.co/datasets/6rightjade/ELUDe"
@@ -38,6 +41,7 @@ papers:
   - title: "PairEval: Open-domain Dialogue Evaluation with Pairwise Comparison"
     authors: "ChaeHun Park, <b>Minseok Choi</b>, Dohyun Lee, Jaegul Choo"
     venue: "COLM 2024"
+    acceptance_rate: "28.9%"
     paper_pdf: "https://arxiv.org/abs/2404.01015"
     code: "https://github.com/ddehun/PairEval"
     selected: y
@@ -65,6 +69,7 @@ papers:
   - title: "HistRED: A Historical Document-Level Relation Extraction Dataset"
     authors: "Soyoung Yang, <b>Minseok Choi</b>, Youngwoo Cho, Jaegul Choo"
     venue: "ACL 2023"
+    acceptance_rate: "22.1%"
     paper_pdf: "https://aclanthology.org/2023.acl-long.180/"
     code: "https://github.com/dudrrm/HistRED"
     data: "https://huggingface.co/datasets/Soyoung/HistRED"
@@ -73,6 +78,7 @@ papers:
   - title: "Rethinking Style Transformer by Energy-based Interpretation: Adversarial Unsupervised Style Transfer using a Pretrained Model"
     authors: "Hojun Cho, Dohee Kim, Seungwoo Ryu, ChaeHun Park, Hyungjong Noh, Jeong-in Hwang, <b>Minseok Choi</b>, Edward Choi, Jaegul Choo"
     venue: "EMNLP 2022"
+    acceptance_rate: "19.8%"
     paper_pdf: "https://aclanthology.org/2022.emnlp-main.366/"
     code: "https://github.com/HojunCho/StyleBART"
     selected: y
