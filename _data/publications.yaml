@@ -5,6 +5,7 @@ papers:
     venue: "EMNLP 2026"
     acceptance_rate: "15.4%"
     paper_pdf: "https://arxiv.org/abs/2606.05743"
+    code: "https://github.com/brightjade/membrane"
     selected: y
 
   - title: "ExpGuard: LLM Content Moderation in Specialized Domains"
