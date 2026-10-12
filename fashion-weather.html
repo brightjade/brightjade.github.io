@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>오늘 날씨</title>
+<!--
+  fashion-weather.html — 서울의 지금 체감온도로 옷차림 기온대를 알려 주는 위젯. Notion Fashion 페이지에 embed한다.
+  Notion에 올린 HTML은 외부 네트워크가 막혀 있어 여기(공개)에 둔다. 옷장·코디 데이터는 넣지 않는다.
+  ?t=14&feel=12&min=9&max=18&rain=10  고정값으로 그림(미리보기)   ?theme=dark|light  색 강제
+-->
+<style>
+  :root { --fg: #37352f; --muted: #787774; --accent: #2383e2; --chip: #f1f1ef; --warn: #d9730d; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
+  }
+  :root[data-theme="dark"] { --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
+  html, body { margin: 0; background: transparent; }
+  body { font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+         color: var(--fg); padding: 10px 4px; }
+  .now { color: var(--muted); }
+  .now b { color: var(--fg); font-size: 17px; }
+  .band { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 6px 0 4px; }
+  .band .name { font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .band .clothes { font-size: 17px; }
+  .hints { color: var(--warn); font-weight: 600; min-height: 1.45em; }
+  .error button { font: inherit; margin-left: 8px; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--muted);
+                  background: var(--chip); color: var(--fg); }
+  .bands { margin-top: 6px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="w" aria-live="polite">불러오는 중…</div>
+<script id="logic">
+  const CITY = { name: "서울", lat: 37.5665, lon: 126.9780, tz: "Asia/Seoul" };
+  // 이름은 closet-sync outfit_model.TEMPS와 한 글자도 다르면 안 된다 (en dash U+2013)
+  const BANDS = [
+    { name: "28°C↑", min: 28, clothes: "민소매·반팔·반바지·린넨" },
+    { name: "23–27°C", min: 23, clothes: "반팔·얇은 셔츠·면바지" },
+    { name: "20–22°C", min: 20, clothes: "긴팔·얇은 가디건·면바지·청바지" },
+    { name: "17–19°C", min: 17, clothes: "얇은 니트·맨투맨·가디건" },
+    { name: "12–16°C", min: 12, clothes: "재킷·가디건·니트" },
+    { name: "9–11°C", min: 9, clothes: "재킷·트렌치·니트" },
+    { name: "5–8°C", min: 5, clothes: "코트·가죽 재킷·히트텍" },
+    { name: "4°C↓", min: -Infinity, clothes: "패딩·두꺼운 코트·목도리·기모" },
+  ];
+  const SKY = [[0, "맑음"], [1, "대체로 맑음"], [2, "구름 조금"], [3, "흐림"], [45, "안개"], [51, "이슬비"],
+               [61, "비"], [71, "눈"], [80, "소나기"], [95, "뇌우"]];
+
+  function bandOf(t) {
+    const r = Math.round(t);
+    return BANDS.find(b => r >= b.min);
+  }
+
+  function skyOf(code) {
+    let text = "";
+    for (const [c, s] of SKY) if (code >= c) text = s;
+    return text;
+  }
+
+  function summarize(d) {
+    const day = d.current.time.slice(0, 10);
+    const hours = [];
+    d.hourly.time.forEach((t, i) => {
+      const h = +t.slice(11, 13);
+      if (t.slice(0, 10) === day && h >= 9 && h <= 21) hours.push(i);
+    });
+    const temps = hours.map(i => d.hourly.temperature_2m[i]).filter(v => v != null);
+    const rains = hours.map(i => (d.hourly.precipitation_probability || [])[i]).filter(v => v != null);
+    const min = temps.length ? Math.min(...temps) : d.current.temperature_2m;
+    const max = temps.length ? Math.max(...temps) : d.current.temperature_2m;
+    const rain = rains.length ? Math.max(...rains) : 0;
+    const band = bandOf(d.current.apparent_temperature);
+    const dayBand = bandOf(max);
+    const hints = [];
+    if (dayBand.name !== band.name) hints.push(`낮엔 ${dayBand.name}`);
+    if (max - min >= 10) hints.push("벗기 쉬운 겉옷");
+    if (rain >= 50) hints.push("우산");
+    return { now: d.current.temperature_2m, feel: d.current.apparent_temperature, min, max, rain,
+             sky: skyOf(d.current.weather_code), band, hints };
+  }
+
+  function fixture(params) {
+    const t = +params.get("t");
+    const feel = params.has("feel") ? +params.get("feel") : t;
+    const min = params.has("min") ? +params.get("min") : t;
+    const max = params.has("max") ? +params.get("max") : t;
+    const rain = +(params.get("rain") || 0);
+    return { current: { time: "2026-10-12T08:00", temperature_2m: t, apparent_temperature: feel, weather_code: 2 },
+             hourly: { time: ["2026-10-12T09:00", "2026-10-12T15:00"], temperature_2m: [min, max],
+                       precipitation_probability: [rain, rain] } };
+  }
+</script>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+  const box = document.getElementById("w");
+  const r0 = n => Math.round(n);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function render(s) {
+    box.innerHTML =
+      `<div class="now">${esc(CITY.name)} 지금 <b>${r0(s.now)}°</b> (체감 ${r0(s.feel)}°) · 낮 ${r0(s.min)}°~${r0(s.max)}°` +
+      ` · 비 ${r0(s.rain)}%${s.sky ? " · " + esc(s.sky) : ""}</div>` +
+      `<div class="band"><span class="name">${esc(s.band.name)}</span><span class="clothes">${esc(s.band.clothes)}</span></div>` +
+      `<div class="hints">${esc(s.hints.join(" · "))}</div>`;
+  }
+
+  function renderError() {
+    box.innerHTML = `<div class="error">날씨를 못 불러옴 <button type="button">다시 시도</button></div>` +
+      `<div class="bands">${BANDS.map(b => esc(`${b.name} ${b.clothes}`)).join(" · ")}</div>`;
+    box.querySelector("button").onclick = load;
+  }
+
+  let loadedAt = 0;
+  async function load() {
+    if (params.has("t")) { render(summarize(fixture(params))); return; }
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + CITY.lat + "&longitude=" + CITY.lon +
+      "&current=temperature_2m,apparent_temperature,weather_code&hourly=temperature_2m,precipitation_probability" +
+      "&timezone=" + encodeURIComponent(CITY.tz) + "&forecast_days=1";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(String(res.status));
+      render(summarize(await res.json()));
+      loadedAt = Date.now();
+    } catch (e) {
+      renderError();
+    }
+  }
+  load();
+  setInterval(load, 30 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Date.now() - loadedAt > 30 * 60 * 1000) load();
+  });
+</script>
+</body>
+</html>
