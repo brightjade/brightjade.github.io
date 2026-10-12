@@ -8,15 +8,16 @@
 <!--
   fashion-weather.html — 서울의 지금 체감온도로 옷차림 기온대를 알려 주는 위젯. Notion Fashion 페이지에 embed한다.
   Notion에 올린 HTML은 외부 네트워크가 막혀 있어 여기(공개)에 둔다. 옷장·코디 데이터는 넣지 않는다.
+  Notion embed 틀은 흰 배경이라 배경색을 테마(prefers-color-scheme)에 맞춰 직접 칠한다.
   ?t=14&feel=12&min=9&max=18&rain=10  고정값으로 그림(미리보기)   ?theme=dark|light  색 강제
 -->
 <style>
-  :root { --fg: #37352f; --muted: #787774; --accent: #2383e2; --chip: #f1f1ef; --warn: #d9730d; }
+  :root { --bg: #ffffff; --fg: #37352f; --muted: #787774; --accent: #2383e2; --chip: #f1f1ef; --warn: #d9730d; }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
+    :root:not([data-theme="light"]) { --bg: #191919; --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
   }
-  :root[data-theme="dark"] { --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
-  html, body { margin: 0; background: transparent; }
+  :root[data-theme="dark"] { --bg: #191919; --fg: #e6e6e4; --muted: #9b9b98; --accent: #529cca; --chip: #2f2f2f; --warn: #ffa344; }
+  html, body { margin: 0; background: var(--bg); }
   body { font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
          color: var(--fg); padding: 10px 4px; }
   .now { color: var(--muted); }
