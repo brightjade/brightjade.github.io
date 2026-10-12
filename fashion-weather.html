@@ -9,7 +9,8 @@
   fashion-weather.html — 서울의 지금 체감온도로 옷차림 기온대를 알려 주는 위젯. Notion Fashion 페이지에 embed한다.
   Notion에 올린 HTML은 외부 네트워크가 막혀 있어 여기(공개)에 둔다. 옷장·코디 데이터는 넣지 않는다.
   Notion embed 틀은 흰 배경이라 배경색을 테마(prefers-color-scheme)에 맞춰 직접 칠한다.
-  ?t=14&feel=12&min=9&max=18&rain=10  고정값으로 그림(미리보기)   ?theme=dark|light  색 강제
+  ?t=14&feel=12&min=9&max=18&rain=10  고정값으로 그림(°C, 미리보기)   ?theme=dark|light  색 강제
+  모든 기온은 °C 뒤에 괄호로 °F를 붙인다 (기온대 이름도 같은 꼴)
 -->
 <style>
   :root { --bg: #ffffff; --fg: #37352f; --muted: #787774; --accent: #2383e2; --chip: #f1f1ef; --warn: #d9730d; }
@@ -22,8 +23,10 @@
          color: var(--fg); padding: 10px 4px; }
   .now { color: var(--muted); }
   .now b { color: var(--fg); font-size: 17px; }
+  .nb { white-space: nowrap; }
   .band { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 6px 0 4px; }
   .band .name { font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .band .name small { font-size: 17px; font-weight: 600; letter-spacing: 0; }
   .band .clothes { font-size: 17px; }
   .hints { color: var(--warn); font-weight: 600; min-height: 1.45em; }
   .error button { font: inherit; margin-left: 8px; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--muted);
@@ -37,17 +40,21 @@
   const CITY = { name: "서울", lat: 37.5665, lon: 126.9780, tz: "Asia/Seoul" };
   // 이름은 closet-sync outfit_model.TEMPS와 한 글자도 다르면 안 된다 (en dash U+2013)
   const BANDS = [
-    { name: "28°C↑", min: 28, clothes: "민소매·반팔·반바지·린넨" },
-    { name: "23–27°C", min: 23, clothes: "반팔·얇은 셔츠·면바지" },
-    { name: "20–22°C", min: 20, clothes: "긴팔·얇은 가디건·면바지·청바지" },
-    { name: "17–19°C", min: 17, clothes: "얇은 니트·맨투맨·가디건" },
-    { name: "12–16°C", min: 12, clothes: "재킷·가디건·니트" },
-    { name: "9–11°C", min: 9, clothes: "재킷·트렌치·니트" },
-    { name: "5–8°C", min: 5, clothes: "코트·가죽 재킷·히트텍" },
-    { name: "4°C↓", min: -Infinity, clothes: "패딩·두꺼운 코트·목도리·기모" },
+    { name: "28°C↑ (82°F↑)", min: 28, clothes: "민소매·반팔·반바지·린넨" },
+    { name: "23–27°C (73–81°F)", min: 23, clothes: "반팔·얇은 셔츠·면바지" },
+    { name: "20–22°C (68–72°F)", min: 20, clothes: "긴팔·얇은 가디건·면바지·청바지" },
+    { name: "17–19°C (63–66°F)", min: 17, clothes: "얇은 니트·맨투맨·가디건" },
+    { name: "12–16°C (54–61°F)", min: 12, clothes: "재킷·가디건·니트" },
+    { name: "9–11°C (48–52°F)", min: 9, clothes: "재킷·트렌치·니트" },
+    { name: "5–8°C (41–46°F)", min: 5, clothes: "코트·가죽 재킷·히트텍" },
+    { name: "4°C↓ (39°F↓)", min: -Infinity, clothes: "패딩·두꺼운 코트·목도리·기모" },
   ];
   const SKY = [[0, "맑음"], [1, "대체로 맑음"], [2, "구름 조금"], [3, "흐림"], [45, "안개"], [51, "이슬비"],
                [61, "비"], [71, "눈"], [80, "소나기"], [95, "뇌우"]];
+
+  const toF = c => Math.round(c * 9 / 5 + 32);
+  const both = c => `${Math.round(c)}°C (${toF(c)}°F)`;
+  const bothRange = (lo, hi) => `${Math.round(lo)}–${Math.round(hi)}°C (${toF(lo)}–${toF(hi)}°F)`;
 
   function bandOf(t) {
     const r = Math.round(t);
@@ -102,10 +109,16 @@
 
   function render(s) {
     box.innerHTML =
-      `<div class="now">${esc(CITY.name)} 지금 <b>${r0(s.now)}°</b> (체감 ${r0(s.feel)}°) · 낮 ${r0(s.min)}°~${r0(s.max)}°` +
+      `<div class="now">${esc(CITY.name)} 지금 <b class="nb">${both(s.now)}</b> · <span class="nb">체감 ${both(s.feel)}</span>` +
+      ` · <span class="nb">낮 ${bothRange(s.min, s.max)}</span>` +
       ` · 비 ${r0(s.rain)}%${s.sky ? " · " + esc(s.sky) : ""}</div>` +
-      `<div class="band"><span class="name">${esc(s.band.name)}</span><span class="clothes">${esc(s.band.clothes)}</span></div>` +
+      `<div class="band"><span class="name">${bandName(s.band.name)}</span><span class="clothes">${esc(s.band.clothes)}</span></div>` +
       `<div class="hints">${esc(s.hints.join(" · "))}</div>`;
+  }
+
+  function bandName(name) {  // "12–16°C (54–61°F)" → °C 크게, °F 작게
+    const i = name.indexOf(" (");
+    return `${esc(name.slice(0, i))} <small>${esc(name.slice(i + 1))}</small>`;
   }
 
   function renderError() {
