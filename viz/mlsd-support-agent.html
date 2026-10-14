@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Customer support agent</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "tool",
+   "label": "툴 · 권한"
+  },
+  {
+   "id": "on",
+   "label": "온라인 — 문의 처리"
+  },
+  {
+   "id": "fb",
+   "label": "평가 · 감시"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "kb",
+   "label": "정책 · FAQ 검색",
+   "kind": "store",
+   "lane": "tool",
+   "col": 1
+  },
+  {
+   "id": "lookup",
+   "label": "주문 조회",
+   "kind": "service",
+   "lane": "tool",
+   "col": 2
+  },
+  {
+   "id": "refund",
+   "label": "환불 · 한도 확인",
+   "kind": "service",
+   "lane": "tool",
+   "col": 3
+  },
+  {
+   "id": "user",
+   "label": "고객 문의",
+   "kind": "person",
+   "lane": "on",
+   "col": 0
+  },
+  {
+   "id": "intent",
+   "label": "의도 분류",
+   "kind": "model",
+   "lane": "on",
+   "col": 1
+  },
+  {
+   "id": "agent",
+   "label": "에이전트 LLM",
+   "kind": "model",
+   "lane": "on",
+   "col": 2
+  },
+  {
+   "id": "reply",
+   "label": "답변 · 확인",
+   "kind": "service",
+   "lane": "on",
+   "col": 3
+  },
+  {
+   "id": "human",
+   "label": "사람 상담원",
+   "kind": "person",
+   "lane": "on",
+   "col": 4
+  },
+  {
+   "id": "logs",
+   "label": "대화 로그",
+   "kind": "store",
+   "lane": "fb",
+   "col": 3
+  },
+  {
+   "id": "evalset",
+   "label": "시뮬레이션 평가",
+   "kind": "service",
+   "lane": "fb",
+   "col": 4
+  }
+ ],
+ "edges": [
+  {
+   "from": "user",
+   "to": "intent"
+  },
+  {
+   "from": "intent",
+   "to": "agent"
+  },
+  {
+   "from": "agent",
+   "to": "kb"
+  },
+  {
+   "from": "agent",
+   "to": "lookup"
+  },
+  {
+   "from": "agent",
+   "to": "refund"
+  },
+  {
+   "from": "agent",
+   "to": "reply"
+  },
+  {
+   "from": "reply",
+   "to": "human"
+  },
+  {
+   "from": "reply",
+   "to": "logs"
+  },
+  {
+   "from": "logs",
+   "to": "evalset"
+  },
+  {
+   "from": "agent",
+   "to": "refund",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "문의가 오면 먼저 <b>의도 분류</b>: 단순 조회·FAQ는 싼 경로로, 환불·계정 변경처럼 위험한 건 따로 표시",
+   "show": [
+    "user",
+    "intent"
+   ]
+  },
+  {
+   "cap": "<b>에이전트 LLM</b>이 대화 맥락을 보고 다음 행동을 정함 — 답할지, 툴을 부를지, 사람에게 넘길지",
+   "show": [
+    "agent"
+   ]
+  },
+  {
+   "cap": "툴은 좁게 나눔: <b>정책·FAQ 검색</b>(RAG), <b>주문 조회</b>(읽기 전용)",
+   "show": [
+    "kb",
+    "lookup"
+   ]
+  },
+  {
+   "cap": "<b>환불</b>처럼 돈이 움직이는 툴은 서버 쪽에서 한도·본인 확인을 강제함 — 모델이 틀려도 정책이 막음",
+   "show": [
+    "refund"
+   ]
+  },
+  {
+   "cap": "답하기 전에 고객에게 <b>확인</b>을 받고, 자신 없거나 화난 고객이면 <b>사람에게 이관</b>",
+   "show": [
+    "reply",
+    "human"
+   ]
+  },
+  {
+   "cap": "<b>대화 로그 → 시뮬레이션 평가</b>: 가상 고객과 수백 번 대화시켜 해결률·정책 위반을 잼(τ-bench 방식)",
+   "show": [
+    "logs",
+    "evalset"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 고객 말만 믿고 환불 툴을 부름 → 툴 쪽 검증이 없으면 그대로 돈이 나감",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

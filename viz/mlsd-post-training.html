@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Post-training pipeline</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "data",
+   "label": "데이터"
+  },
+  {
+   "id": "train",
+   "label": "학습"
+  },
+  {
+   "id": "eval",
+   "label": "평가 · 출시"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "prompts",
+   "label": "프롬프트 수집",
+   "kind": "store",
+   "lane": "data",
+   "col": 0
+  },
+  {
+   "id": "sample",
+   "label": "응답 샘플링",
+   "kind": "model",
+   "lane": "data",
+   "col": 1
+  },
+  {
+   "id": "label",
+   "label": "선호 라벨",
+   "kind": "person",
+   "lane": "data",
+   "col": 2
+  },
+  {
+   "id": "rm",
+   "label": "보상 모델",
+   "kind": "model",
+   "lane": "train",
+   "col": 2
+  },
+  {
+   "id": "rl",
+   "label": "RL · KL 제약",
+   "kind": "model",
+   "lane": "train",
+   "col": 3
+  },
+  {
+   "id": "verifier",
+   "label": "검증기 · 규칙 보상",
+   "kind": "service",
+   "lane": "train",
+   "col": 4
+  },
+  {
+   "id": "evals",
+   "label": "평가 · 레드팀",
+   "kind": "service",
+   "lane": "eval",
+   "col": 3
+  },
+  {
+   "id": "ship",
+   "label": "체크포인트 선택",
+   "kind": "person",
+   "lane": "eval",
+   "col": 4
+  }
+ ],
+ "edges": [
+  {
+   "from": "prompts",
+   "to": "sample"
+  },
+  {
+   "from": "sample",
+   "to": "label"
+  },
+  {
+   "from": "label",
+   "to": "rm"
+  },
+  {
+   "from": "rm",
+   "to": "rl"
+  },
+  {
+   "from": "verifier",
+   "to": "rl"
+  },
+  {
+   "from": "rl",
+   "to": "evals"
+  },
+  {
+   "from": "evals",
+   "to": "ship"
+  },
+  {
+   "from": "rl",
+   "to": "ship",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>프롬프트 수집</b>: 실제 사용 분포 + 약한 영역을 일부러 채움. 평가셋과 겹치지 않게 분리",
+   "show": [
+    "prompts"
+   ]
+  },
+  {
+   "cap": "현재 모델로 <b>응답 샘플링</b> — 같은 프롬프트에 여러 답",
+   "show": [
+    "sample"
+   ]
+  },
+  {
+   "cap": "<b>선호 라벨</b>: 사람 또는 AI(원칙·루브릭)가 둘 중 나은 답을 고름. 라벨러 일치도도 잼",
+   "show": [
+    "label"
+   ]
+  },
+  {
+   "cap": "<b>보상 모델</b>을 선호 쌍으로 학습(Bradley–Terry). 정답을 확인할 수 있는 작업은 <b>검증기·규칙 보상</b>으로 (B9)",
+   "show": [
+    "rm",
+    "verifier"
+   ]
+  },
+  {
+   "cap": "<b>RL</b>(PPO·GRPO)로 보상을 올리되 참조 모델과의 <b>KL</b>로 멀리 못 가게 묶음. 새 샘플로 다시 돎 (C1)",
+   "show": [
+    "rl"
+   ]
+  },
+  {
+   "cap": "<b>평가·레드팀</b>으로 능력·안전·과잉 거절을 따로 보고 <b>체크포인트를 고름</b>",
+   "show": [
+    "evals",
+    "ship"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 보상 점수만 보고 체크포인트를 고르면 보상 해킹된 모델이 나감 → 따로 둔 평가와 KL·길이 감시",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

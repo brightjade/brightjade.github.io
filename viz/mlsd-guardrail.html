@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>LLM guardrails</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "on",
+   "label": "온라인 — 요청 처리"
+  },
+  {
+   "id": "ops",
+   "label": "검토 · 정책 갱신"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "user",
+   "label": "사용자 요청",
+   "kind": "person",
+   "lane": "on",
+   "col": 0
+  },
+  {
+   "id": "inguard",
+   "label": "입력 분류기",
+   "kind": "model",
+   "lane": "on",
+   "col": 1
+  },
+  {
+   "id": "llm",
+   "label": "LLM",
+   "kind": "model",
+   "lane": "on",
+   "col": 2
+  },
+  {
+   "id": "outguard",
+   "label": "출력 분류기",
+   "kind": "model",
+   "lane": "on",
+   "col": 3
+  },
+  {
+   "id": "reply",
+   "label": "답 · 거절",
+   "kind": "service",
+   "lane": "on",
+   "col": 4
+  },
+  {
+   "id": "policy",
+   "label": "정책 · 위험 범주",
+   "kind": "store",
+   "lane": "ops",
+   "col": 1
+  },
+  {
+   "id": "queue",
+   "label": "사람 검토 큐",
+   "kind": "person",
+   "lane": "ops",
+   "col": 2
+  },
+  {
+   "id": "relabel",
+   "label": "라벨 · 재학습",
+   "kind": "service",
+   "lane": "ops",
+   "col": 3
+  }
+ ],
+ "edges": [
+  {
+   "from": "user",
+   "to": "inguard"
+  },
+  {
+   "from": "inguard",
+   "to": "llm"
+  },
+  {
+   "from": "llm",
+   "to": "outguard"
+  },
+  {
+   "from": "outguard",
+   "to": "reply"
+  },
+  {
+   "from": "policy",
+   "to": "inguard"
+  },
+  {
+   "from": "inguard",
+   "to": "queue"
+  },
+  {
+   "from": "outguard",
+   "to": "queue"
+  },
+  {
+   "from": "queue",
+   "to": "relabel"
+  },
+  {
+   "from": "relabel",
+   "to": "outguard"
+  },
+  {
+   "from": "inguard",
+   "to": "reply",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>정책·위험 범주</b>부터: 무엇을 막을지 범주와 예시를 문서로 정함(예: MLCommons 위험 범주)",
+   "show": [
+    "policy"
+   ]
+  },
+  {
+   "cap": "요청이 오면 <b>입력 분류기</b>가 먼저 봄 — 작고 빠른 가드 모델이 위험도 점수를 냄",
+   "show": [
+    "user",
+    "inguard"
+   ]
+  },
+  {
+   "cap": "통과한 요청만 <b>LLM</b>으로. 시스템 프롬프트에도 정책을 넣지만 그것만 믿지 않음",
+   "show": [
+    "llm"
+   ]
+  },
+  {
+   "cap": "<b>출력 분류기</b>가 답을 다시 봄 — 요청이 무해해 보여도 답이 위험할 수 있음",
+   "show": [
+    "outguard"
+   ]
+  },
+  {
+   "cap": "<b>답 또는 거절</b>. 거절할 땐 이유와 대안을 짧게, 애매하면 안전한 범위에서 답함",
+   "show": [
+    "reply"
+   ]
+  },
+  {
+   "cap": "애매한 건 <b>사람 검토 큐</b>로 → <b>라벨·재학습</b>으로 분류기를 계속 고침",
+   "show": [
+    "queue",
+    "relabel"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 비슷하게 생긴 정상 요청까지 막음 → 과잉 거절률을 counter 지표로 같이 잼 (C10)",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

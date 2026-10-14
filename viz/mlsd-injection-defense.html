@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prompt injection defense</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "trust",
+   "label": "신뢰 구역"
+  },
+  {
+   "id": "untrusted",
+   "label": "신뢰 못 하는 입력"
+  },
+  {
+   "id": "red",
+   "label": "red-team"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "user",
+   "label": "사용자 지시",
+   "kind": "person",
+   "lane": "trust",
+   "col": 0
+  },
+  {
+   "id": "planner",
+   "label": "계획 LLM",
+   "kind": "model",
+   "lane": "trust",
+   "col": 1
+  },
+  {
+   "id": "policy",
+   "label": "권한 검사",
+   "kind": "service",
+   "lane": "trust",
+   "col": 2
+  },
+  {
+   "id": "tool",
+   "label": "툴 실행",
+   "kind": "service",
+   "lane": "trust",
+   "col": 3
+  },
+  {
+   "id": "confirm",
+   "label": "사용자 확인",
+   "kind": "person",
+   "lane": "trust",
+   "col": 4
+  },
+  {
+   "id": "web",
+   "label": "웹 · 메일 내용",
+   "kind": "data",
+   "lane": "untrusted",
+   "col": 1
+  },
+  {
+   "id": "reader",
+   "label": "격리 LLM",
+   "kind": "model",
+   "lane": "untrusted",
+   "col": 2
+  },
+  {
+   "id": "attack",
+   "label": "공격 생성기",
+   "kind": "model",
+   "lane": "red",
+   "col": 2
+  },
+  {
+   "id": "update",
+   "label": "방어 갱신",
+   "kind": "service",
+   "lane": "red",
+   "col": 3
+  }
+ ],
+ "edges": [
+  {
+   "from": "user",
+   "to": "planner"
+  },
+  {
+   "from": "planner",
+   "to": "policy"
+  },
+  {
+   "from": "policy",
+   "to": "tool"
+  },
+  {
+   "from": "tool",
+   "to": "confirm"
+  },
+  {
+   "from": "web",
+   "to": "reader"
+  },
+  {
+   "from": "reader",
+   "to": "planner"
+  },
+  {
+   "from": "attack",
+   "to": "web"
+  },
+  {
+   "from": "attack",
+   "to": "update"
+  },
+  {
+   "from": "web",
+   "to": "planner",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>신뢰 구역</b>: 사용자 지시만 <b>계획 LLM</b>이 읽고 무엇을 할지 정함",
+   "show": [
+    "user",
+    "planner"
+   ]
+  },
+  {
+   "cap": "웹·메일은 <b>신뢰 못 하는 입력</b> — <b>격리 LLM</b>이 읽어 값(주소·날짜 등)만 뽑아 넘기고, 지시는 안 넘김",
+   "show": [
+    "web",
+    "reader"
+   ]
+  },
+  {
+   "cap": "툴을 부르기 전 <b>권한 검사</b>: 이 작업에 필요한 최소 권한만, 데이터가 어디서 왔는지도 같이 봄",
+   "show": [
+    "policy"
+   ]
+  },
+  {
+   "cap": "<b>툴 실행</b> — 송금·삭제·외부 전송처럼 되돌릴 수 없는 행동은 <b>사용자 확인</b>을 받음",
+   "show": [
+    "tool",
+    "confirm"
+   ]
+  },
+  {
+   "cap": "<b>공격 생성기</b>가 숨은 지시를 심은 페이지를 계속 만들어 시험함(자동 red-teaming)",
+   "show": [
+    "attack"
+   ]
+  },
+  {
+   "cap": "뚫린 사례로 <b>방어 갱신</b>: 정책·분류기·프롬프트를 고치고 회귀 테스트에 넣음",
+   "show": [
+    "update"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 웹 내용이 계획 LLM에 그대로 들어가면 숨은 지시가 툴 호출로 이어짐",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

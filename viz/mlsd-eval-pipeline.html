@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Model release evaluation</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "run",
+   "label": "평가 실행"
+  },
+  {
+   "id": "check",
+   "label": "검사 · 판정"
+  },
+  {
+   "id": "gate",
+   "label": "출시 결정"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "ckpt",
+   "label": "새 체크포인트",
+   "kind": "model",
+   "lane": "run",
+   "col": 0
+  },
+  {
+   "id": "bench",
+   "label": "능력 벤치",
+   "kind": "service",
+   "lane": "run",
+   "col": 1
+  },
+  {
+   "id": "safety",
+   "label": "안전 평가",
+   "kind": "service",
+   "lane": "run",
+   "col": 2
+  },
+  {
+   "id": "judge",
+   "label": "사람 · LLM judge",
+   "kind": "person",
+   "lane": "run",
+   "col": 3
+  },
+  {
+   "id": "contam",
+   "label": "오염 검사",
+   "kind": "service",
+   "lane": "check",
+   "col": 1
+  },
+  {
+   "id": "compare",
+   "label": "기준 모델 비교",
+   "kind": "service",
+   "lane": "check",
+   "col": 2
+  },
+  {
+   "id": "errbar",
+   "label": "에러바 · 유의성",
+   "kind": "service",
+   "lane": "check",
+   "col": 3
+  },
+  {
+   "id": "report",
+   "label": "평가 리포트",
+   "kind": "store",
+   "lane": "gate",
+   "col": 3
+  },
+  {
+   "id": "release",
+   "label": "출시 게이트",
+   "kind": "person",
+   "lane": "gate",
+   "col": 4
+  }
+ ],
+ "edges": [
+  {
+   "from": "ckpt",
+   "to": "bench"
+  },
+  {
+   "from": "bench",
+   "to": "safety"
+  },
+  {
+   "from": "safety",
+   "to": "judge"
+  },
+  {
+   "from": "bench",
+   "to": "contam"
+  },
+  {
+   "from": "contam",
+   "to": "compare"
+  },
+  {
+   "from": "safety",
+   "to": "compare"
+  },
+  {
+   "from": "judge",
+   "to": "errbar"
+  },
+  {
+   "from": "compare",
+   "to": "errbar"
+  },
+  {
+   "from": "errbar",
+   "to": "report"
+  },
+  {
+   "from": "report",
+   "to": "release"
+  },
+  {
+   "from": "bench",
+   "to": "compare",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>새 체크포인트</b>가 나오면 같은 설정(프롬프트·샘플링·시드)으로 평가를 자동 실행",
+   "show": [
+    "ckpt"
+   ]
+  },
+  {
+   "cap": "<b>능력 벤치</b>(추론·코딩·지식)와 <b>안전 평가</b>(유해 응답·과잉 거절)를 같이 돌림",
+   "show": [
+    "bench",
+    "safety"
+   ]
+  },
+  {
+   "cap": "숫자로 안 잡히는 건 <b>사람·LLM judge</b> — judge는 사람 라벨과 맞는지 먼저 확인 (C11)",
+   "show": [
+    "judge"
+   ]
+  },
+  {
+   "cap": "<b>오염 검사</b>: 벤치 문항이 학습 데이터에 들어갔는지 n-gram·임베딩으로 확인",
+   "show": [
+    "contam"
+   ]
+  },
+  {
+   "cap": "<b>기준 모델과 비교</b>하고 <b>에러바·유의성</b>을 붙임 — 2점 차이가 노이즈인지 가름 (C12)",
+   "show": [
+    "compare",
+    "errbar"
+   ]
+  },
+  {
+   "cap": "<b>평가 리포트 → 출시 게이트</b>: 회귀가 있으면 막고, 사람이 최종 결정",
+   "show": [
+    "report",
+    "release"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 오염 검사를 건너뛰고 점수를 바로 비교 → 외운 문제로 오른 점수를 진짜 향상으로 착각",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

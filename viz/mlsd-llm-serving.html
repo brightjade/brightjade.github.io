@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>LLM serving</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "req",
+   "label": "요청 경로"
+  },
+  {
+   "id": "engine",
+   "label": "추론 엔진"
+  },
+  {
+   "id": "ops",
+   "label": "운영"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "client",
+   "label": "API 요청",
+   "kind": "person",
+   "lane": "req",
+   "col": 0
+  },
+  {
+   "id": "gateway",
+   "label": "게이트웨이 · 한도",
+   "kind": "service",
+   "lane": "req",
+   "col": 1
+  },
+  {
+   "id": "router",
+   "label": "모델 라우터",
+   "kind": "service",
+   "lane": "req",
+   "col": 2
+  },
+  {
+   "id": "cache",
+   "label": "prefix · 응답 캐시",
+   "kind": "store",
+   "lane": "req",
+   "col": 3
+  },
+  {
+   "id": "small",
+   "label": "작은 모델",
+   "kind": "model",
+   "lane": "engine",
+   "col": 2
+  },
+  {
+   "id": "prefill",
+   "label": "prefill 노드",
+   "kind": "model",
+   "lane": "engine",
+   "col": 3
+  },
+  {
+   "id": "decode",
+   "label": "decode 노드",
+   "kind": "model",
+   "lane": "engine",
+   "col": 4
+  },
+  {
+   "id": "monitor",
+   "label": "지연 · 비용 감시",
+   "kind": "service",
+   "lane": "ops",
+   "col": 3
+  },
+  {
+   "id": "autoscale",
+   "label": "오토스케일",
+   "kind": "service",
+   "lane": "ops",
+   "col": 4
+  }
+ ],
+ "edges": [
+  {
+   "from": "client",
+   "to": "gateway"
+  },
+  {
+   "from": "gateway",
+   "to": "router"
+  },
+  {
+   "from": "router",
+   "to": "cache"
+  },
+  {
+   "from": "router",
+   "to": "small"
+  },
+  {
+   "from": "cache",
+   "to": "prefill"
+  },
+  {
+   "from": "prefill",
+   "to": "decode"
+  },
+  {
+   "from": "decode",
+   "to": "monitor"
+  },
+  {
+   "from": "monitor",
+   "to": "autoscale"
+  },
+  {
+   "from": "autoscale",
+   "to": "decode"
+  },
+  {
+   "from": "router",
+   "to": "small",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>게이트웨이</b>: 인증·사용량 한도·요청 길이 확인. 여기서 잰 QPS·토큰/초가 전체 설계의 근거",
+   "show": [
+    "client",
+    "gateway"
+   ]
+  },
+  {
+   "cap": "<b>모델 라우터</b>: 쉬운 요청은 <b>작은 모델</b>로 보내 비용을 줄임",
+   "show": [
+    "router",
+    "small"
+   ]
+  },
+  {
+   "cap": "<b>캐시</b>: 시스템 프롬프트 같은 공통 앞부분은 KV를 재사용(prefix caching), 같은 질문은 응답 캐시",
+   "show": [
+    "cache"
+   ]
+  },
+  {
+   "cap": "<b>prefill</b>(프롬프트를 한 번에, 연산이 병목)과 <b>decode</b>(토큰 하나씩, 메모리 대역폭이 병목)를 다른 노드로 나눔 (F2)",
+   "show": [
+    "prefill",
+    "decode"
+   ]
+  },
+  {
+   "cap": "decode는 <b>continuous batching</b>·PagedAttention으로 GPU를 꽉 채움 — 처리량이 몇 배 오름 (F4)",
+   "show": []
+  },
+  {
+   "cap": "<b>지연·비용 감시</b>(첫 토큰 지연·토큰당 지연·p99·GPU 사용률) → <b>오토스케일</b>",
+   "show": [
+    "monitor",
+    "autoscale"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 라우터가 어려운 요청을 작은 모델로 보내면 비용은 줄지만 답이 나빠짐 → 라우팅 정확도와 품질 지표를 같이 감시",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

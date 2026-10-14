@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Coding agent</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+ "lanes": [
+  {
+   "id": "plan",
+   "label": "계획 · 맥락"
+  },
+  {
+   "id": "act",
+   "label": "샌드박스 실행"
+  },
+  {
+   "id": "out",
+   "label": "검증 · 결과"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "task",
+   "label": "작업 · 이슈",
+   "kind": "person",
+   "lane": "plan",
+   "col": 0
+  },
+  {
+   "id": "search",
+   "label": "저장소 검색",
+   "kind": "service",
+   "lane": "plan",
+   "col": 1
+  },
+  {
+   "id": "planner",
+   "label": "에이전트 LLM",
+   "kind": "model",
+   "lane": "plan",
+   "col": 2
+  },
+  {
+   "id": "memory",
+   "label": "맥락 압축 · 메모",
+   "kind": "store",
+   "lane": "plan",
+   "col": 3
+  },
+  {
+   "id": "sandbox",
+   "label": "격리 컨테이너",
+   "kind": "service",
+   "lane": "act",
+   "col": 2
+  },
+  {
+   "id": "tests",
+   "label": "테스트 실행",
+   "kind": "service",
+   "lane": "act",
+   "col": 3
+  },
+  {
+   "id": "review",
+   "label": "사람 리뷰",
+   "kind": "person",
+   "lane": "out",
+   "col": 3
+  },
+  {
+   "id": "pr",
+   "label": "PR",
+   "kind": "store",
+   "lane": "out",
+   "col": 4
+  }
+ ],
+ "edges": [
+  {
+   "from": "task",
+   "to": "search"
+  },
+  {
+   "from": "search",
+   "to": "planner"
+  },
+  {
+   "from": "planner",
+   "to": "sandbox"
+  },
+  {
+   "from": "sandbox",
+   "to": "tests"
+  },
+  {
+   "from": "tests",
+   "to": "planner"
+  },
+  {
+   "from": "planner",
+   "to": "memory"
+  },
+  {
+   "from": "tests",
+   "to": "review"
+  },
+  {
+   "from": "review",
+   "to": "pr"
+  },
+  {
+   "from": "tests",
+   "to": "review",
+   "fail": true,
+   "at": 6
+  }
+ ],
+ "steps": [
+  {
+   "cap": "<b>작업</b>(이슈·요청)을 받으면 먼저 <b>저장소 검색</b>: 파일 구조·관련 코드·테스트 위치",
+   "show": [
+    "task",
+    "search"
+   ]
+  },
+  {
+   "cap": "<b>에이전트 LLM</b>이 계획을 세우고 한 번에 한 단계씩 툴(읽기·편집·실행)을 부름",
+   "show": [
+    "planner"
+   ]
+  },
+  {
+   "cap": "명령은 <b>격리 컨테이너</b>에서만 실행: 네트워크·비밀키 차단, 시간·자원 한도",
+   "show": [
+    "sandbox"
+   ]
+  },
+  {
+   "cap": "<b>테스트 실행</b> 결과를 다시 읽고 고침 — 이 루프가 코딩 에이전트의 핵심",
+   "show": [
+    "tests"
+   ]
+  },
+  {
+   "cap": "긴 작업은 <b>맥락 압축·메모</b>: 오래된 툴 출력은 요약하고 계획·결정은 파일로 남김 (A3)",
+   "show": [
+    "memory"
+   ]
+  },
+  {
+   "cap": "<b>사람 리뷰 → PR</b>: diff·테스트 결과·궤적을 같이 보여 주고 사람이 합침 (C9)",
+   "show": [
+    "review",
+    "pr"
+   ]
+  },
+  {
+   "cap": "<b>실패 경로</b>: 테스트를 고쳐서 통과시킴 → 테스트 파일 변경은 따로 표시하고 리뷰에서 막음",
+   "show": []
+  }
+ ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>
