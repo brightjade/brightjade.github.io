@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import vm from "node:vm";
 
 function load(path, names) {
@@ -201,4 +201,66 @@ test("learning rate schedules", () => {
   assert.ok(lr(500, { ...o, kind: "cosine" }) < 0.7 && lr(500, { ...o, kind: "cosine" }) > 0.5);
   assert.ok(Math.abs(lr(700, { ...o, kind: "wsd", decay: 0.2 }) - 1) < 1e-9);   // stable 구간은 평평
   assert.ok(Math.abs(lr(1000, { ...o, kind: "wsd", decay: 0.2 }) - 0.1) < 1e-9);
+});
+
+const SAMPLE = {
+  lanes: [{ id: "off", label: "오프라인" }, { id: "on", label: "온라인" }],
+  nodes: [
+    { id: "docs", label: "문서", kind: "store", lane: "off", col: 0 },
+    { id: "index", label: "색인", kind: "store", lane: "off", col: 1 },
+    { id: "q", label: "질문", kind: "person", lane: "on", col: 0 },
+    { id: "llm", label: "LLM", kind: "model", lane: "on", col: 1 },
+  ],
+  edges: [{ from: "docs", to: "index" }, { from: "q", to: "llm" }, { from: "index", to: "llm" },
+          { from: "index", to: "llm", fail: true, at: 2 }],
+  steps: [{ cap: "a", show: ["docs", "index"] }, { cap: "b", show: ["q", "llm"] }, { cap: "c", show: [] }],
+};
+
+test("arch reveals nodes cumulatively and edges when both ends are on", () => {
+  const { visibleAt } = load("../viz/lib/arch.js", "visibleAt");
+  assert.deepEqual([...visibleAt(SAMPLE, 0).nodes], ["docs", "index"]);
+  assert.deepEqual([...visibleAt(SAMPLE, 0).edges], [0]);
+  assert.deepEqual([...visibleAt(SAMPLE, 1).edges], [0, 1, 2]);      // 실패 경로는 아직
+  assert.deepEqual([...visibleAt(SAMPLE, 2).edges], [0, 1, 2, 3]);
+});
+
+test("arch layout stays inside the width and turns vertical on phones", () => {
+  const { place } = load("../viz/lib/arch.js", "place");
+  for (const width of [704, 358]) {
+    const { box, vertical } = place(SAMPLE, width);
+    assert.equal(vertical, width < 480);
+    for (const b of Object.values(box)) assert.ok(b.x >= 0 && b.x + b.w <= width + 1e-9);
+  }
+  const wide = place(SAMPLE, 704).box, narrow = place(SAMPLE, 358).box;
+  assert.ok(wide.docs.y < wide.q.y && wide.docs.x === wide.q.x);         // 넓으면 줄이 가로로 쌓임
+  assert.ok(narrow.docs.x < narrow.q.x && narrow.docs.y === narrow.q.y);  // 좁으면 줄이 세로 칸이 됨
+});
+
+test("arch edges leave from the facing sides", () => {
+  const { ends } = load("../viz/lib/arch.js", "ends");
+  const a = { x: 0, y: 0, w: 100, h: 40 }, b = { x: 150, y: 0, w: 100, h: 40 }, c = { x: 0, y: 100, w: 100, h: 40 };
+  assert.deepEqual([...ends(a, b)], [100, 20, 150, 20]);
+  assert.deepEqual([...ends(a, c)], [50, 40, 50, 100]);
+  assert.deepEqual([...ends(b, a)], [150, 20, 100, 20]);
+});
+
+test("arch data checks", () => {
+  const { checkArch } = load("../viz/lib/arch.js", "checkArch");
+  assert.deepEqual([...checkArch(SAMPLE)], []);
+  const bad = JSON.parse(JSON.stringify(SAMPLE));
+  bad.nodes.push({ id: "docs", label: "x", kind: "data", lane: "nowhere", col: 0 });
+  bad.edges.push({ from: "ghost", to: "llm" });
+  const out = checkArch(bad).join("\n");
+  for (const word of ["중복", "없는 줄", "ghost"]) assert.ok(out.includes(word), word);
+});
+
+test("every mlsd figure has valid arch data", () => {
+  const { checkArch } = load("../viz/lib/arch.js", "checkArch");
+  const dir = new URL("../viz/", import.meta.url);
+  for (const f of readdirSync(dir).filter(f => /^mlsd-.*\.html$/.test(f))) {
+    const html = readFileSync(new URL(f, dir), "utf8");
+    const m = /<script id="arch" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+    assert.ok(m, `${f}: arch 데이터 없음`);
+    assert.deepEqual([...checkArch(JSON.parse(m[1]))], [], f);
+  }
 });
