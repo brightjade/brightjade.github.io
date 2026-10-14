@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>YouTube</title>
 <!--
-  yt.html?v=<11-char id>[&t=90 | 90s | 1m30s]
+  yt.html?v=<11-char id>[&t=90 | 90s | 1m30s][&e=<end, same forms>]
   Wraps a YouTube embed in an https page so the player request carries a Referer.
   Apps that render embeds in a WebView (Notion mobile) send none, and YouTube then
   refuses with error 153 ("Video player configuration error").
@@ -19,22 +19,29 @@
 </style>
 </head>
 <body>
-<script>
-  const params = new URLSearchParams(location.search);
-  const id = params.get("v") || "";
-
+<script id="logic">
   function seconds(t) {
     if (/^\d+s?$/.test(t)) return parseInt(t, 10);
     const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t);
     return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0;
   }
 
-  if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+  function embedSrc(params) {
+    const id = params.get("v") || "";
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
     const query = new URLSearchParams({ rel: "0", playsinline: "1" });
     const start = seconds(params.get("t") || "");
+    const end = seconds(params.get("e") || "");
     if (start > 0) query.set("start", start);
+    if (end > start) query.set("end", end);
+    return `https://www.youtube.com/embed/${id}?${query}`;
+  }
+</script>
+<script>
+  const src = embedSrc(new URLSearchParams(location.search));
+  if (src) {
     const frame = document.createElement("iframe");
-    frame.src = `https://www.youtube.com/embed/${id}?${query}`;
+    frame.src = src;
     frame.title = "YouTube video player";
     frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
     frame.allowFullscreen = true;
