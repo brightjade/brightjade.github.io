@@ -368,3 +368,22 @@ test("2D diffusion: forward to noise, reverse back to data", () => {
   const hit = new Set(out.map(p => MODES.reduce((b, m, i) => Math.hypot(p[0] - m[0], p[1] - m[1]) < Math.hypot(p[0] - MODES[b][0], p[1] - MODES[b][1]) ? i : b, 0)));
   assert.ok(hit.size >= 7);                                                                 // 봉우리 대부분을 덮음
 });
+
+test("CLIP contrastive loss and zero-shot", () => {
+  const { embed, sims, clipLoss, zeroShot, N } = logic("clip-contrastive.html", "embed, sims, clipLoss, zeroShot, N");
+  const lossAt = a => clipLoss(sims(embed(a)), 0.07);
+  assert.ok(Math.abs(clipLoss(sims(embed(0)), 1e9) - Math.log(N)) < 1e-6);   // 온도가 아주 크면 log N
+  assert.ok(lossAt(1) < lossAt(0.5) && lossAt(0.5) < lossAt(0));            // 정렬될수록 loss↓
+  const S = sims(embed(1));
+  for (let i = 0; i < N; i++) assert.equal(S[i].indexOf(Math.max(...S[i])), i);   // 대각선이 각 행의 최대
+  const p = zeroShot(embed(1), 2, 0.07);
+  assert.equal(p.indexOf(Math.max(...p)), 2);
+});
+
+test("ViT patch tokens", () => {
+  const { tokens, attnCost } = logic("vit-patches.html", "tokens, attnCost");
+  assert.equal(tokens(224, 16, 1), 196);
+  assert.equal(tokens(336, 14, 1), 576);                                     // LLaVA-1.5의 시각 토큰
+  assert.equal(tokens(336, 14, 2), 144);                                     // 2×2 병합
+  assert.ok(Math.abs(attnCost(448, 16) / attnCost(224, 16) - 16) < 1e-9);    // 해상도 2배 → 토큰 4배 → attention 16배
+});
