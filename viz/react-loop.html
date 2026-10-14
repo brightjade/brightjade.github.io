@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ReAct loop</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:hidden"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script src="lib/stepper.js"></script>
+<script>
+  const STEPS = [
+    {cap: "질문이 들어옴: <b>2024년 노벨 물리학상 수상자의 소속 대학은?</b>", llm: [], env: []},
+    {cap: "LLM이 먼저 <b>Thought</b>를 씀 — 무엇을 모르는지 말로 정리", llm: ["Thought: 수상자부터 찾아야 함"], env: []},
+    {cap: "<b>Action</b>: 툴 호출을 정해진 형식(JSON)으로 냄. 실행은 LLM이 아니라 바깥 코드가 함",
+     llm: ["Thought: 수상자부터 찾아야 함", 'Action: search({"q": "2024 Nobel Prize physics"})'], env: []},
+    {cap: "<b>Observation</b>: 툴 결과가 context 끝에 그대로 붙음 — LLM은 이걸 읽고 다음 토큰을 이어 씀",
+     llm: ["Thought: 수상자부터 찾아야 함", 'Action: search({"q": "2024 Nobel Prize physics"})'], env: ["Observation: John Hopfield, Geoffrey Hinton"]},
+    {cap: "다시 Thought → Action. 루프는 LLM이 끝내겠다고 할 때까지 돔(보통 최대 단계 수로 막음)",
+     llm: ["…", "Thought: Hinton의 소속을 찾아야 함", 'Action: search({"q": "Geoffrey Hinton affiliation"})'], env: ["Observation: John Hopfield, Geoffrey Hinton", "Observation: University of Toronto"]},
+    {cap: "<b>Final Answer</b>. 단계마다 context가 길어짐 → 긴 작업에선 context 관리가 핵심 (A3)",
+     llm: ["…", "Final Answer: Hopfield는 Princeton, Hinton은 University of Toronto"], env: ["Observation: …", "Observation: University of Toronto"]},
+  ];
+  const stage = document.getElementById("stage"), dots = document.getElementById("dots");
+  dots.innerHTML = STEPS.map(() => "<span></span>").join("");
+  const box = (title, lines, color) => `<div style="border:1px solid var(--line);border-radius:8px;padding:8px;overflow:auto">
+    <div style="color:${color};font-weight:600;margin-bottom:4px">${title}</div>${lines.length ? lines.map(l => `<div style="font-family:ui-monospace,monospace;font-size:13px;margin:4px 0">${l}</div>`).join("") : `<div style="color:var(--muted)">(아직 없음)</div>`}</div>`;
+  const s = makeStepper(STEPS, i => {
+    const st = STEPS[i];
+    document.getElementById("cap").innerHTML = `<b>${i + 1}/${STEPS.length}</b> ${st.cap}`;
+    stage.innerHTML = box("LLM 출력", st.llm, "var(--accent)") + box("환경 (툴 실행)", st.env, "var(--warn)");
+    [...dots.children].forEach((d, j) => d.classList.toggle("on", j === i));
+  });
+  document.getElementById("prev").onclick = s.prev;
+  document.getElementById("next").onclick = s.next;
+  document.addEventListener("keydown", e => { if (e.key === "ArrowRight") s.next(); if (e.key === "ArrowLeft") s.prev(); });
+  s.go((parseInt(location.hash.slice(1), 10) || 1) - 1);   // #4 = 4단계부터 (미리보기용)
+</script>
+</body>
+</html>

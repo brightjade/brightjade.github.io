@@ -1,0 +1,13 @@
+:root { --bg:#ffffff; --fg:#1f2328; --muted:#656d76; --line:#d0d7de; --accent:#0969da; --good:#1a7f37; --bad:#cf222e; --warn:#9a6700; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#8d96a0; --line:#30363d; --accent:#4493f8; --good:#3fb950; --bad:#f85149; --warn:#d29922; } }
+html, body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+#app { box-sizing:border-box; max-width:760px; height:440px; margin:0 auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.stage { flex:1; min-height:0; }
+.caption { min-height:3em; }
+.controls { display:flex; align-items:center; gap:8px; }
+.controls button { font:inherit; padding:4px 12px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--fg); cursor:pointer; }
+.dots { display:flex; gap:4px; }
+.dots span { width:8px; height:8px; border-radius:50%; background:var(--line); }
+.dots span.on { background:var(--accent); }
+input[type=range] { width:100%; accent-color:var(--accent); }
+@media (max-width: 420px) { html, body { font-size:13px; } #app { padding:8px; } }

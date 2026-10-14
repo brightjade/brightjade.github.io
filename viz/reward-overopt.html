@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Reward over-optimization</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 300" preserveAspectRatio="xMidYMid meet"></svg>
+  <label>KL 계수 β = <b id="bv"></b><input type="range" id="beta" min="0.02" max="0.6" step="0.01" value="0.25"></label>
+  <div style="color:var(--muted);font-size:12px">곡선 모양: Gao et al. 2022 (Scaling Laws for Reward Model Overoptimization). 숫자는 설명용.</div>
+</div>
+<script id="logic">
+  const A_GOLD = 1.0, B_GOLD = 0.45, A_PROXY = 0.9, D_MAX = 8;
+  function gold(d) { return d <= 0 ? 0 : d * (A_GOLD - B_GOLD * Math.log(d)); }
+  function proxy(d) { return A_PROXY * d; }
+  function goldPeak() { return Math.exp(A_GOLD / B_GOLD - 1); }
+  function stopAt(beta) { return Math.min(D_MAX, A_PROXY / (2 * beta)); }   // argmax proxy(d) − β d²
+</script>
+<script>
+  const svg = document.getElementById("plot"), slider = document.getElementById("beta");
+  const X = d => 50 + d / D_MAX * 620, Y = r => 270 - r * 32;
+  const path = f => Array.from({length: 161}, (_, i) => { const d = i / 160 * D_MAX; return `${i ? "L" : "M"}${X(d).toFixed(1)},${Y(f(d)).toFixed(1)}`; }).join("");
+  function draw() {
+    const beta = +slider.value, d = stopAt(beta), peak = goldPeak(), past = d > peak;
+    document.getElementById("bv").textContent = beta.toFixed(2);
+    svg.innerHTML = `
+      <line x1="50" y1="270" x2="680" y2="270" stroke="var(--line)"/><line x1="50" y1="20" x2="50" y2="270" stroke="var(--line)"/>
+      <text x="680" y="292" text-anchor="end" fill="var(--muted)" font-size="13">정책이 멀어진 정도 √KL →</text>
+      <path d="${path(proxy)}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <path d="${path(gold)}" fill="none" stroke="var(--good)" stroke-width="2.5"/>
+      <text x="${X(6.3)}" y="${Y(proxy(6.3)) - 10}" text-anchor="end" fill="var(--accent)" font-size="13">proxy reward (RM 점수)</text>
+      <text x="${X(peak)}" y="${Y(gold(peak)) - 12}" text-anchor="middle" fill="var(--good)" font-size="13">gold reward (진짜 선호)</text>
+      <line x1="${X(peak)}" y1="20" x2="${X(peak)}" y2="270" stroke="var(--good)" stroke-dasharray="4 4" opacity=".6"/>
+      <line x1="${X(d)}" y1="20" x2="${X(d)}" y2="270" stroke="${past ? "var(--bad)" : "var(--fg)"}" stroke-width="2"/>
+      <circle cx="${X(d)}" cy="${Y(gold(d))}" r="6" fill="${past ? "var(--bad)" : "var(--good)"}"/>`;
+    document.getElementById("cap").innerHTML = past
+      ? `β가 작아 정책이 봉우리를 <b style="color:var(--bad)">지나침</b> — RM 점수는 계속 오르지만 진짜 선호는 떨어지는 중 (reward hacking)`
+      : `KL 패널티가 정책을 봉우리 <b style="color:var(--good)">왼쪽</b>에 묶어 둠 — 대신 β가 너무 크면 거의 안 배움`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>
