@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Chinchilla</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 260" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">compute C = <b id="cv"></b> FLOPs</span><input type="range" id="c" min="20" max="25" step="0.1" value="23"></label>
+  <div style="color:var(--muted);font-size:12px">L(N, D) = E + A/N^α + B/D^β, C ≈ 6ND. 계수는 Chinchilla 재현 연구(Besiroglu et al. 2024)의 적합값. 같은 compute에서 모델 크기 N을 바꿀 때의 loss.</div>
+</div>
+<script id="logic">
+  const E = 1.82, A = 482.01, B = 2085.43, AL = 0.3478, BE = 0.3658;
+  function loss(N, D) { return E + A / N ** AL + B / D ** BE; }
+  function optimum(C) {
+    let best = null;
+    for (let x = 7; x <= 13; x += 0.01) {
+      const N = 10 ** x, D = C / 6 / N, L = loss(N, D);
+      if (!best || L < best.L) best = { N, D, L };
+    }
+    return best;
+  }
+</script>
+<script>
+  const svg = document.getElementById("plot"), slider = document.getElementById("c");
+  const fmt = n => n >= 1e12 ? (n / 1e12).toFixed(1) + "T" : n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : (n / 1e6).toFixed(0) + "M";
+  function draw() {
+    const C = 10 ** +slider.value, o = optimum(C), lo = o.N / 4;
+    document.getElementById("cv").textContent = "1e" + (+slider.value).toFixed(1);
+    const xs = [], X = x => 60 + (x - 7) / 6 * 600;
+    for (let x = 7; x <= 13; x += 0.05) xs.push([x, loss(10 ** x, C / 6 / 10 ** x)]);
+    const ys = xs.map(p => p[1]).filter(v => v < o.L + 1.2), ymin = o.L - 0.05, ymax = o.L + 1.2;
+    const Y = v => 220 - (Math.min(v, ymax) - ymin) / (ymax - ymin) * 190;
+    const path = xs.map(([x, v], i) => `${i ? "L" : "M"}${X(x)},${Y(v)}`).join("");
+    const L4 = loss(lo, C / 6 / lo);
+    svg.innerHTML = `<line x1="60" y1="220" x2="660" y2="220" stroke="var(--line)"/>` +
+      [7, 8, 9, 10, 11, 12, 13].map(x => `<text x="${X(x)}" y="238" text-anchor="middle" font-size="11" fill="var(--muted)">${fmt(10 ** x)}</text>`).join("") +
+      `<text x="660" y="254" text-anchor="end" font-size="12" fill="var(--muted)">모델 크기 N (log) — 왼쪽일수록 작은 모델·많은 토큰</text>` +
+      `<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>` +
+      `<circle cx="${X(Math.log10(o.N))}" cy="${Y(o.L)}" r="7" fill="var(--good)"/>` +
+      `<text x="${X(Math.log10(o.N)) + 10}" y="${Y(o.L) - 14}" text-anchor="start" font-size="12" fill="var(--good)">최적 ${fmt(o.N)} · ${fmt(o.D)} 토큰</text>` +
+      `<circle cx="${X(Math.log10(lo))}" cy="${Y(L4)}" r="6" fill="var(--warn)"/>` +
+      `<text x="${X(Math.log10(lo)) - 10}" y="${Y(L4) - 14}" text-anchor="end" font-size="12" fill="var(--warn)">¼ 크기로 4배 오래</text>`;
+    document.getElementById("cap").innerHTML = `최적: 파라미터 <b>${fmt(o.N)}</b>, 토큰 <b>${fmt(o.D)}</b> → 토큰/파라미터 ≈ <b>${(o.D / o.N).toFixed(0)}</b>. ` +
+      `¼ 크기 모델은 loss가 ${(L4 - o.L).toFixed(3)}만 높고 추론 비용은 ¼ — 그래서 요즘은 일부러 더 오래 학습함`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>

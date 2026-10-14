@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Decoding</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">temperature <b id="tv"></b></span><input type="range" id="t" min="0.05" max="2" step="0.05" value="1"></label>
+  <label class="row"><span style="white-space:nowrap">top-k <b id="kv"></b></span><input type="range" id="k" min="1" max="8" step="1" value="8"></label>
+  <label class="row"><span style="white-space:nowrap">top-p <b id="pv"></b></span><input type="range" id="p" min="0.1" max="1" step="0.05" value="1"></label>
+  <div style="color:var(--muted);font-size:12px">"오늘 날씨가 ___"의 다음 토큰 후보 8개. 흐린 막대 = 원래 확률, 진한 막대 = 실제로 뽑을 확률(temperature → top-k → top-p 순서로 적용 후 재정규화).</div>
+</div>
+<script id="logic">
+  function process(logits, T, k, p) {
+    const m = Math.max(...logits), e = logits.map(l => Math.exp((l - m) / T)), z = e.reduce((a, b) => a + b, 0);
+    let probs = e.map(x => x / z);
+    const order = probs.map((q, i) => i).sort((a, b) => probs[b] - probs[a]);
+    const keep = new Set(order.slice(0, k));                         // top-k
+    let cum = 0;
+    for (const i of order) { if (!keep.has(i)) continue; if (cum >= p) keep.delete(i); else cum += probs[i]; }  // top-p
+    probs = probs.map((q, i) => keep.has(i) ? q : 0);
+    const s = probs.reduce((a, b) => a + b, 0);
+    return probs.map(q => q / s);
+  }
+</script>
+<script>
+  const TOK = ["맑다", "좋다", "흐리다", "춥다", "덥다", "이상하다", "미쳤다", "바나나"], LOG = [3, 2.5, 2, 1, 0.5, 0, -0.5, -1];
+  const svg = document.getElementById("plot"), T = document.getElementById("t"), K = document.getElementById("k"), P = document.getElementById("p");
+  function draw() {
+    const t = +T.value, k = +K.value, p = +P.value, base = process(LOG, 1, 8, 1), out = process(LOG, t, k, p);
+    document.getElementById("tv").textContent = t.toFixed(2);
+    document.getElementById("kv").textContent = k;
+    document.getElementById("pv").textContent = p.toFixed(2);
+    svg.innerHTML = `<line x1="30" y1="160" x2="680" y2="160" stroke="var(--line)"/>` + TOK.map((w, i) => {
+      const x = 45 + i * 80;
+      return `<rect x="${x}" y="${160 - base[i] * 140}" width="50" height="${base[i] * 140}" fill="var(--muted)" opacity=".25"/>` +
+        `<rect x="${x + 12}" y="${160 - out[i] * 140}" width="26" height="${out[i] * 140}" fill="var(--accent)"/>` +
+        `<text x="${x + 25}" y="178" text-anchor="middle" font-size="12" fill="var(--fg)">${w}</text>` +
+        `<text x="${x + 25}" y="${152 - Math.max(base[i], out[i]) * 140}" text-anchor="middle" font-size="10" fill="var(--muted)">${out[i] > 0.005 ? (out[i] * 100).toFixed(0) + "%" : ""}</text>`;
+    }).join("");
+    const n = out.filter(x => x > 0).length;
+    document.getElementById("cap").innerHTML = t < 0.2 ? "temperature가 0에 가까우면 사실상 greedy — 항상 같은 답"
+      : `후보 ${n}개에서 뽑음 · temperature ↑ = 분포를 평평하게(다양·위험), top-k = 상위 k개만, top-p = 누적 확률 p까지만 (분포 모양에 따라 개수가 바뀜)`;
+  }
+  [T, K, P].forEach(el => el.addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>

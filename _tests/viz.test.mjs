@@ -118,3 +118,22 @@ test("rope dot depends only on relative position", () => {
   assert.ok(Math.abs(score(3, 1) - score(8, 6)) < 1e-9);
   assert.ok(Math.abs(score(3, 1) - score(3, 2)) > 1e-3);
 });
+
+test("chinchilla compute-optimal ratio", () => {
+  const { optimum, loss } = logic("chinchilla.html", "optimum, loss");
+  const o = optimum(1e23);
+  assert.ok(o.D / o.N > 10 && o.D / o.N < 40);                 // 토큰/파라미터 ≈ 20
+  assert.ok(loss(o.N / 4, (1e23 / 6) / (o.N / 4)) > o.L);        // 같은 compute에서 작은 모델은 loss가 약간 높음
+  assert.ok(optimum(1e24).N > o.N);
+});
+
+test("decoding filters", () => {
+  const { process } = logic("decoding.html", "process");
+  const L = [3, 2.5, 2, 1, 0.5, 0, -0.5, -1];
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  assert.ok(Math.abs(sum(process(L, 1, 8, 1)) - 1) < 1e-9);
+  assert.ok(process(L, 0.05, 8, 1)[0] > 0.99);                   // T → 0이면 greedy
+  assert.deepEqual([...process(L, 1, 1, 1)].map(x => Math.round(x)), [1, 0, 0, 0, 0, 0, 0, 0]);
+  const p = process(L, 1, 8, 0.5);
+  assert.ok(p.filter(x => x > 0).length < 8);                   // top-p가 꼬리를 자름
+});
