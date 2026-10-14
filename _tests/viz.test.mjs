@@ -328,3 +328,30 @@ test("SVD low-rank approximation", () => {
   const R = u.map(a => v.map(b => a * b));
   assert.ok(svd(R).S[1] < 1e-9);                                           // rank-1 행렬은 특이값 하나
 });
+
+test("bias-variance with polynomial fits", () => {
+  const { experiment } = logic("bias-variance.html", "experiment");
+  const r = d => experiment(d, 15, 7);
+  for (let d = 2; d <= 12; d++) assert.ok(r(d).train <= r(d - 1).train + 1e-9);   // train 오차는 차수와 함께 줄기만 함
+  assert.ok(r(1).test > r(4).test);                                            // 너무 단순: bias
+  assert.ok(r(12).test > r(4).test);                                           // 너무 복잡: variance
+  assert.ok(r(12).spread > 3 * r(1).spread);                                   // 데이터셋마다 곡선이 크게 달라짐
+});
+
+test("ROC is prevalence-free, precision is not", () => {
+  const { metrics, auc } = logic("pr-roc.html", "metrics, auc");
+  const a = metrics(1, 0.5, 2), b = metrics(1, 0.01, 2);
+  assert.ok(Math.abs(a.recall - b.recall) < 1e-12 && Math.abs(a.fpr - b.fpr) < 1e-12);
+  assert.ok(a.precision > 0.8 && b.precision < 0.1);                           // 양성 1%면 precision 붕괴
+  assert.ok(Math.abs(auc(2) - 0.9214) < 1e-3);                                 // Φ(2/√2)
+});
+
+test("L1 hits the axis, L2 only shrinks", () => {
+  const { solve } = logic("l1-l2.html", "solve");
+  const l1 = solve("l1", 1.2), l2 = solve("l2", 1.2);
+  assert.equal(l1[1], 0);                                                      // L1: 작은 가중치가 정확히 0
+  assert.ok(l2[1] > 0.01);                                                     // L2: 작아질 뿐 0은 아님
+  assert.ok(Math.hypot(...solve("l2", 1.2)) < Math.hypot(...solve("l2", 0.3)));
+  const z = solve("l1", 0);
+  assert.ok(Math.abs(z[0] - 2) < 1e-6 && Math.abs(z[1] - 0.6) < 1e-6);         // λ = 0이면 최소제곱 해
+});

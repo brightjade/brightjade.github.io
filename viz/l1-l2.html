@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>L1 vs L2</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;flex:none}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="seg" id="kind"><button data-v="l1" class="on">L1 (lasso)</button><button data-v="l2">L2 (ridge)</button></div>
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab">정규화 세기 λ <b id="lv"></b></span><input type="range" id="lam" min="0" max="2.2" step="0.02" value="0.6"></label>
+  <div style="color:var(--muted);font-size:12px">loss = ½(w − w*)ᵀH(w − w*) + λ·penalty, 정규화 없는 해 w* = (2, 0.6). L1 penalty = |w₁| + |w₂|, L2 penalty = w₁² + w₂².</div>
+</div>
+<script id="logic">
+  const WS = [2, 0.6], H = [[1, 0.4], [0.4, 1.3]];
+  const soft = (c, l) => Math.sign(c) * Math.max(Math.abs(c) - l, 0);
+  function solve(kind, lam) {
+    if (kind === "l2") {                      // (H + 2λI) w = H w*
+      const a = H[0][0] + 2 * lam, b = H[0][1], c = H[1][0], d = H[1][1] + 2 * lam, det = a * d - b * c;
+      const r0 = H[0][0] * WS[0] + H[0][1] * WS[1], r1 = H[1][0] * WS[0] + H[1][1] * WS[1];
+      return [(d * r0 - b * r1) / det, (a * r1 - c * r0) / det];
+    }
+    const w = [0, 0];                         // 좌표 하강 + soft-threshold
+    for (let it = 0; it < 500; it++) {
+      w[0] = soft(H[0][0] * WS[0] - H[0][1] * (w[1] - WS[1]), lam) / H[0][0];
+      w[1] = soft(H[1][1] * WS[1] - H[1][0] * (w[0] - WS[0]), lam) / H[1][1];
+    }
+    return w;
+  }
+  function loss(w) { const a = w[0] - WS[0], b = w[1] - WS[1]; return 0.5 * (H[0][0] * a * a + 2 * H[0][1] * a * b + H[1][1] * b * b); }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  let kind = "l1";
+  const X = a => 180 + a * 100, Y = b => 140 - b * 100;
+  function ellipse(level) {                   // loss = level인 등고선
+    const pts = [];
+    for (let i = 0; i <= 120; i++) {
+      const th = i / 120 * 2 * Math.PI, u = [Math.cos(th), Math.sin(th)];
+      const q = 0.5 * (H[0][0] * u[0] * u[0] + 2 * H[0][1] * u[0] * u[1] + H[1][1] * u[1] * u[1]), r = Math.sqrt(level / q);
+      pts.push(`${X(WS[0] + r * u[0]).toFixed(1)},${Y(WS[1] + r * u[1]).toFixed(1)}`);
+    }
+    return pts.join(" ");
+  }
+  function draw() {
+    const lam = +I("lam").value, w = solve(kind, lam);
+    I("lv").textContent = lam.toFixed(2);
+    let s = `<line x1="${X(-1.7)}" x2="${X(5)}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><line x1="${X(0)}" x2="${X(0)}" y1="${Y(-1.1)}" y2="${Y(1.3)}" stroke="var(--line)"/>
+      <text x="${X(4.95)}" y="${Y(0) - 6}" font-size="12" text-anchor="end" fill="var(--muted)">w₁</text><text x="${X(0) + 6}" y="${Y(1.22)}" font-size="12" fill="var(--muted)">w₂</text>`;
+    for (const lv of [0.05, 0.2, 0.5, 1, 1.6]) s += `<polyline points="${ellipse(lv)}" fill="none" stroke="var(--line)"/>`;
+    const lw = loss(w);
+    if (lw > 1e-6) s += `<polyline points="${ellipse(lw)}" fill="none" stroke="var(--warn)" stroke-width="2"/>`;
+    if (kind === "l1") { const r = Math.abs(w[0]) + Math.abs(w[1]); s += `<polygon points="${X(r)},${Y(0)} ${X(0)},${Y(r)} ${X(-r)},${Y(0)} ${X(0)},${Y(-r)}" fill="var(--accent)" opacity=".18" stroke="var(--accent)" stroke-width="2"/>`; }
+    else { const r = Math.hypot(...w); s += `<ellipse cx="${X(0)}" cy="${Y(0)}" rx="${r * 100}" ry="${r * 100}" fill="var(--accent)" opacity=".18" stroke="var(--accent)" stroke-width="2"/>`; }
+    const path = Array.from({ length: 111 }, (_, i) => solve(kind, i * 0.02));
+    s += `<polyline points="${path.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--fg)" stroke-dasharray="3 3" opacity=".6"/>`;
+    s += `<circle cx="${X(WS[0])}" cy="${Y(WS[1])}" r="4" fill="var(--warn)"/><text x="${X(WS[0]) + 8}" y="${Y(WS[1]) - 6}" font-size="12" fill="var(--warn)">w* (정규화 없음)</text>`;
+    s += `<circle cx="${X(w[0])}" cy="${Y(w[1])}" r="6" fill="var(--accent)"/>`;
+    s += `<text x="10" y="20" font-size="14" font-weight="600" fill="var(--accent)">해 w = (${w[0].toFixed(2)}, ${w[1].toFixed(2)})</text>`;
+    s += `<text x="10" y="38" font-size="12" fill="var(--muted)">점선: λ를 0 → 2.2로 키울 때 해가 지나는 길</text>`;
+    svg.innerHTML = s;
+    I("cap").innerHTML = kind === "l1"
+      ? (w[1] === 0 && lam > 0
+        ? `L1: 해가 <b style="color:var(--accent)">꼭짓점(축 위)</b>에 닿아 w₂가 <b>정확히 0</b> — 마름모의 뾰족한 꼭짓점이 축 위에 있어 등고선이 거기 먼저 닿기 쉬움 → sparse, feature 선택 효과`
+        : `L1: λ를 키우면 마름모가 작아지며 해가 축 쪽으로 이동. 약 1.1부터 작은 가중치 w₂가 정확히 0이 됨`)
+      : `L2: 원에는 꼭짓점이 없어 등고선이 아무 데서나 닿음 → 모든 가중치가 비율대로 <b>작아질 뿐 0은 안 됨</b>. 서로 비슷한(상관된) feature에 가중치를 나눠 줌`;
+  }
+  I("kind").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    kind = b.dataset.v; [...I("kind").children].forEach(x => x.classList.toggle("on", x === b)); draw();
+  });
+  I("lam").addEventListener("input", draw);
+  if (location.hash === "#l2") I("kind").children[1].click(); else { if (location.hash === "#zero") I("lam").value = 1.4; draw(); }
+</script>
+</body>
+</html>

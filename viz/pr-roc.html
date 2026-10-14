@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Precision, recall, ROC</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;flex:none}#nums{font-size:14px;display:flex;gap:2px 14px;flex-wrap:wrap}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div id="nums"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 210" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab">임계값 <b id="tv"></b></span><input type="range" id="t" min="-2" max="5" step="0.05" value="1"></label>
+  <label class="row"><span class="lab">양성 비율 <b id="pv"></b></span><input type="range" id="p" min="-3" max="-0.3" step="0.01" value="-0.3"></label>
+  <label class="row"><span class="lab">모델 분리도 <b id="dv"></b></span><input type="range" id="d" min="0.5" max="4" step="0.1" value="2"></label>
+</div>
+<script id="logic">
+  // 모델 점수: 음성 ~ N(0, 1), 양성 ~ N(d, 1). 점수가 임계값 t 이상이면 양성으로 판정
+  function Phi(x) {
+    const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z);
+    const erf = 1 - t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z);
+    return 0.5 * (1 + (x >= 0 ? erf : -erf));
+  }
+  function metrics(t, prev, d) {
+    const recall = 1 - Phi(t - d), fpr = 1 - Phi(t);
+    const tp = prev * recall, fp = (1 - prev) * fpr;
+    return { recall, fpr, precision: tp + fp > 0 ? tp / (tp + fp) : 1, tp, fp, fn: prev * (1 - recall) };
+  }
+  function auc(d) { return Phi(d / Math.SQRT2); }    // 무작위 양성 점수 > 무작위 음성 점수일 확률
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  const pdf = (x, m) => Math.exp(-0.5 * (x - m) ** 2) / Math.sqrt(2 * Math.PI);
+  function draw() {
+    const t = +I("t").value, prev = 10 ** +I("p").value, d = +I("d").value, m = metrics(t, prev, d);
+    I("tv").textContent = t.toFixed(2); I("pv").textContent = (prev * 100 < 1 ? (prev * 100).toFixed(1) : (prev * 100).toFixed(0)) + "%"; I("dv").textContent = d.toFixed(1);
+    // 왼쪽: 클래스 비율을 반영한 점수 분포
+    const X = x => 15 + (x + 3) / 10 * 370, top = Math.max(prev, 1 - prev) * pdf(0, 0), Y = v => 175 - v / top * 150;
+    const curve = (w, mu) => Array.from({ length: 201 }, (_, i) => { const x = -3 + i / 20; return `${i ? "L" : "M"}${X(x).toFixed(1)},${Y(w * pdf(x, mu)).toFixed(1)}`; }).join("");
+    const area = (w, mu, from) => { const xs = Array.from({ length: 101 }, (_, i) => from + (7 - from) * i / 100); return `M${X(from)},175 ` + xs.map(x => `L${X(x).toFixed(1)},${Y(w * pdf(x, mu)).toFixed(1)}`).join(" ") + ` L${X(7)},175 Z`; };
+    let s = `<line x1="15" x2="385" y1="175" y2="175" stroke="var(--line)"/>
+      <path d="${area(1 - prev, 0, t)}" fill="var(--bad)" opacity=".3"/><path d="${area(prev, d, t)}" fill="var(--good)" opacity=".4"/>
+      <path d="${curve(1 - prev, 0)}" fill="none" stroke="var(--bad)" stroke-width="2"/><path d="${curve(prev, d)}" fill="none" stroke="var(--good)" stroke-width="2.5"/>
+      <line x1="${X(t)}" x2="${X(t)}" y1="15" y2="175" stroke="var(--fg)" stroke-width="2"/>
+      <text x="${X(t) + 5}" y="26" font-size="12" fill="var(--fg)">이 오른쪽 = 양성 판정</text>
+      <text x="15" y="196" font-size="12" fill="var(--bad)">음성 (빨간 칠 = FP)</text><text x="385" y="196" font-size="12" text-anchor="end" fill="var(--good)">양성 (초록 칠 = TP)</text>`;
+    // 오른쪽: ROC · PR
+    const ts = Array.from({ length: 141 }, (_, i) => 6 - i * 0.07).map(u => metrics(u, prev, d));
+    const box = (x0, title, xl, yl) => `<rect x="${x0}" y="20" width="130" height="130" fill="none" stroke="var(--line)"/><text x="${x0}" y="14" font-size="12" font-weight="600" fill="var(--fg)">${title}</text><text x="${x0 + 130}" y="166" font-size="11" text-anchor="end" fill="var(--muted)">${xl}</text><text x="${x0 - 4}" y="26" font-size="11" text-anchor="end" fill="var(--muted)">${yl}</text>`;
+    const P = (x0, a, b) => `${(x0 + a * 130).toFixed(1)},${(150 - b * 130).toFixed(1)}`;
+    s += box(410, `ROC · AUC ${auc(d).toFixed(3)}`, "FPR →", "TPR") + `<polyline points="${ts.map(q => P(410, q.fpr, q.recall)).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2"/><line x1="410" y1="150" x2="540" y2="20" stroke="var(--line)" stroke-dasharray="3 3"/><circle cx="${P(410, m.fpr, m.recall).split(",")[0]}" cy="${P(410, m.fpr, m.recall).split(",")[1]}" r="5" fill="var(--fg)"/>`;
+    s += box(562, "PR", "recall →", "prec.") + `<polyline points="${ts.map(q => P(562, q.recall, q.precision)).join(" ")}" fill="none" stroke="var(--warn)" stroke-width="2"/><line x1="562" y1="${150 - prev * 130}" x2="692" y2="${150 - prev * 130}" stroke="var(--line)" stroke-dasharray="3 3"/><circle cx="${P(562, m.recall, m.precision).split(",")[0]}" cy="${P(562, m.recall, m.precision).split(",")[1]}" r="5" fill="var(--fg)"/>`;
+    svg.innerHTML = s;
+    const k = v => Math.round(v * 10000).toLocaleString();
+    I("nums").innerHTML = `<span>1만 명 중 TP <b style="color:var(--good)">${k(m.tp)}</b> · FP <b style="color:var(--bad)">${k(m.fp)}</b> · FN ${k(m.fn)}</span><span>precision <b>${(m.precision * 100).toFixed(1)}%</b></span><span>recall <b>${(m.recall * 100).toFixed(1)}%</b></span><span>FPR ${(m.fpr * 100).toFixed(1)}%</span>`;
+    I("cap").innerHTML = prev < 0.05
+      ? `양성이 ${(prev * 100).toFixed(1)}%뿐이면 FPR이 작아도 음성이 워낙 많아 FP가 TP를 압도 → <b style="color:var(--bad)">precision ${(m.precision * 100).toFixed(0)}%</b>. ROC·AUC는 그대로라 이 붕괴가 안 보임 → 불균형엔 PR 곡선을 볼 것`
+      : `임계값을 올리면 precision↑ recall↓. ROC는 양성 비율과 무관(TPR·FPR은 각 클래스 안의 비율). 양성 비율을 1%로 내려 볼 것`;
+  }
+  ["t", "p", "d"].forEach(id => I(id).addEventListener("input", draw));
+  if (location.hash === "#rare") I("p").value = -2;
+  draw();
+</script>
+</body>
+</html>
