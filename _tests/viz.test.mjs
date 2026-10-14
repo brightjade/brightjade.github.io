@@ -86,3 +86,20 @@ test("pass@k curves cross", () => {
   assert.ok(passAtK(base, 256) > passAtK(rl, 256));
   assert.ok(passAtK(base, 8) > passAtK(base, 2));
 });
+
+test("refusal trade-off", () => {
+  const { rates } = logic("refusal-tradeoff.html", "rates");
+  const lo = rates(0.3, 1.5), hi = rates(0.7, 1.5);
+  assert.ok(hi.overRefusal < lo.overRefusal);        // 임계값을 올리면 과잉 거절은 줄고
+  assert.ok(hi.attackSuccess > lo.attackSuccess);    // 공격 성공은 늘어남
+  const better = rates(0.5, 3), worse = rates(0.5, 1);
+  assert.ok(better.overRefusal < worse.overRefusal && better.attackSuccess < worse.attackSuccess);
+});
+
+test("eval error bars", () => {
+  const { halfWidth } = logic("eval-error-bars.html", "halfWidth");
+  assert.ok(halfWidth(200, 1) > halfWidth(5000, 1));          // 문항이 많을수록 좁아짐
+  assert.ok(halfWidth(1000, 10) > halfWidth(1000, 1));        // 같은 지문 문항 묶음(군집)은 넓힘
+  assert.ok(halfWidth(200, 1) * 100 > 2);                     // 200문항에선 2점 차이가 오차 안
+  assert.ok(halfWidth(10000, 1) * 100 < 2);
+});

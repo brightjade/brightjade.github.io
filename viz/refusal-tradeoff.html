@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Refusal trade-off</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 230" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">거절 임계값 <b id="tv"></b></span><input type="range" id="t" min="0.05" max="0.95" step="0.01" value="0.5"></label>
+  <label class="row"><span style="white-space:nowrap">모델이 구분하는 능력 <b id="sv"></b></span><input type="range" id="s" min="0.5" max="4" step="0.1" value="1.5"></label>
+  <div style="color:var(--muted);font-size:12px">"위험해 보이는 정도" 점수가 임계값을 넘으면 거절. 무해하지만 위험해 보이는 질문(초록)과 진짜 유해한 질문(빨강)의 점수 분포. 숫자는 설명용.</div>
+</div>
+<script id="logic">
+  const erf = x => { const t = 1 / (1 + 0.3275911 * Math.abs(x)), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
+  const cdf = (x, mu, sd) => 0.5 * (1 + erf((x - mu) / (sd * Math.SQRT2)));
+  // 점수 0~1 축에서 무해(benign) 평균 0.5 − d/8, 유해 평균 0.5 + d/8, 표준편차 0.12
+  function rates(threshold, sep) {
+    const mb = 0.5 - sep / 8, mh = 0.5 + sep / 8, sd = 0.12;
+    return { overRefusal: 1 - cdf(threshold, mb, sd), attackSuccess: cdf(threshold, mh, sd), mb, mh, sd };
+  }
+</script>
+<script>
+  const svg = document.getElementById("plot"), t = document.getElementById("t"), s = document.getElementById("s");
+  const X = v => 40 + v * 620, pdf = (x, mu, sd) => Math.exp(-((x - mu) ** 2) / (2 * sd * sd));
+  function curve(mu, sd, color, from, to, fill) {
+    const pts = [];
+    for (let i = 0; i <= 200; i++) { const x = i / 200; pts.push([x, pdf(x, mu, sd)]); }
+    const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${X(x)},${180 - y * 150}`).join("");
+    const area = pts.filter(([x]) => x >= from && x <= to);
+    const shade = area.length ? `M${X(area[0][0])},180 ` + area.map(([x, y]) => `L${X(x)},${180 - y * 150}`).join(" ") + ` L${X(area.at(-1)[0])},180 Z` : "";
+    return `<path d="${shade}" fill="${color}" opacity=".3"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  }
+  function draw() {
+    const th = +t.value, sep = +s.value, r = rates(th, sep);
+    document.getElementById("tv").textContent = th.toFixed(2);
+    document.getElementById("sv").textContent = sep.toFixed(1);
+    svg.innerHTML = `<line x1="40" y1="180" x2="660" y2="180" stroke="var(--line)"/>` +
+      curve(r.mb, r.sd, "var(--good)", th, 1) + curve(r.mh, r.sd, "var(--bad)", 0, th) +
+      `<line x1="${X(th)}" y1="15" x2="${X(th)}" y2="185" stroke="var(--fg)" stroke-width="2"/>` +
+      `<text x="${X(th) + 6}" y="28" font-size="12" fill="var(--fg)">여기부터 거절 →</text>` +
+      `<text x="${X(r.mb)}" y="200" text-anchor="middle" font-size="12" fill="var(--good)">무해한 질문</text>` +
+      `<text x="${X(r.mh)}" y="200" text-anchor="middle" font-size="12" fill="var(--bad)">유해한 질문</text>` +
+      `<text x="40" y="222" font-size="11" fill="var(--muted)">위험해 보이는 정도 →</text>`;
+    document.getElementById("cap").innerHTML = `과잉 거절 <b style="color:var(--good)">${(r.overRefusal * 100).toFixed(0)}%</b> · 공격 성공 <b style="color:var(--bad)">${(r.attackSuccess * 100).toFixed(0)}%</b> — 임계값만 옮기면 하나를 줄일 때 다른 하나가 늘어남. 둘 다 줄이려면 구분 능력(아래 슬라이더)을 키워야 함`;
+  }
+  t.addEventListener("input", draw); s.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>

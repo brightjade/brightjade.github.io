@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Eval error bars</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 190" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">문항 수 <b id="nv"></b></span><input type="range" id="n" min="2" max="4" step="0.05" value="2.3"></label>
+  <label class="row"><span style="white-space:nowrap">한 지문에 딸린 문항 수 <b id="mv"></b></span><input type="range" id="m" min="1" max="20" step="1" value="1"></label>
+  <label class="row"><span style="white-space:nowrap">관찰된 점수 차이 <b id="dv"></b>점</span><input type="range" id="d" min="0" max="6" step="0.5" value="2"></label>
+  <div style="color:var(--muted);font-size:12px">정확도 70% 근처, 두 모델을 다른 문항 표본으로 본다고 가정한 95% 구간. 같은 지문 문항끼리 상관(ICC 0.3)이 있으면 구간이 넓어짐(clustered SE).</div>
+</div>
+<script id="logic">
+  const P = 0.7, ICC = 0.3;
+  // 두 모델 정확도 차이의 95% 구간 반폭(비율 단위). m = 군집 크기 → design effect 1 + (m − 1)·ICC
+  function halfWidth(n, m) {
+    const se = Math.sqrt(2 * P * (1 - P) / n) * Math.sqrt(1 + (m - 1) * ICC);
+    return 1.96 * se;
+  }
+</script>
+<script>
+  const svg = document.getElementById("plot"), nS = document.getElementById("n"), mS = document.getElementById("m"), dS = document.getElementById("d");
+  const X = v => 350 + v * 40;   // 점수(점) 축: −8 ~ +8
+  function draw() {
+    const n = Math.round(10 ** +nS.value), m = +mS.value, d = +dS.value, h = halfWidth(n, m) * 100;
+    document.getElementById("nv").textContent = n.toLocaleString();
+    document.getElementById("mv").textContent = m;
+    document.getElementById("dv").textContent = d;
+    const sig = d - h > 0;
+    svg.innerHTML = `<line x1="30" y1="100" x2="670" y2="100" stroke="var(--line)"/>` +
+      [-8, -4, 0, 4, 8].map(v => `<line x1="${X(v)}" y1="95" x2="${X(v)}" y2="105" stroke="var(--line)"/><text x="${X(v)}" y="122" text-anchor="middle" font-size="11" fill="var(--muted)">${v > 0 ? "+" : ""}${v}</text>`).join("") +
+      `<line x1="${X(0)}" y1="40" x2="${X(0)}" y2="140" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="${X(0)}" y="34" text-anchor="middle" font-size="11" fill="var(--muted)">차이 없음</text>` +
+      `<line x1="${X(Math.max(-8, d - h))}" y1="75" x2="${X(Math.min(8, d + h))}" y2="75" stroke="${sig ? "var(--good)" : "var(--bad)"}" stroke-width="6" stroke-linecap="round"/>` +
+      `<circle cx="${X(d)}" cy="75" r="7" fill="var(--fg)"/>` +
+      `<text x="${X(d)}" y="60" text-anchor="middle" font-size="12" fill="var(--fg)">${d}점 ± ${h.toFixed(1)}</text>` +
+      `<text x="670" y="160" text-anchor="end" font-size="12" fill="var(--muted)">모델 B − 모델 A (점)</text>`;
+    document.getElementById("cap").innerHTML = sig
+      ? `구간이 0을 안 지남 → ${d}점 차이는 <b style="color:var(--good)">우연으로 보기 어려움</b>`
+      : `구간이 0을 지남 → ${d}점 차이는 <b style="color:var(--bad)">문항을 다시 뽑으면 뒤집힐 수 있음</b>`;
+  }
+  [nS, mS, dS].forEach(el => el.addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>
