@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Diffusion in 2D</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;flex:none}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="seg" id="mode"><button data-v="fwd" class="on">앞으로: 노이즈 섞기</button><button data-v="rev">뒤로: 생성</button></div>
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab" id="tl">노이즈 단계 t</span><input type="range" id="t" min="0" max="100" step="1" value="0"></label>
+  <div style="color:var(--muted);font-size:12px">데이터 = 원 위의 봉우리 8개. 점 400개, T = 100단계, β는 0.001 → 0.1. 이 장난감에선 노이즈 섞인 분포의 score를 정확히 계산할 수 있어 신경망 대신 그걸로 되돌림(실제 모델은 이 화살표를 신경망이 학습).</div>
+</div>
+<script id="logic">
+  const T = 100, S0 = 0.12;
+  const MODES = Array.from({ length: 8 }, (_, k) => [2 * Math.cos(k * Math.PI / 4), 2 * Math.sin(k * Math.PI / 4)]);
+  const BETA = Array.from({ length: T + 1 }, (_, t) => t ? 0.001 + (0.1 - 0.001) * (t - 1) / (T - 1) : 0);
+  const ABAR = BETA.reduce((a, b, t) => (a.push(t ? a[t - 1] * (1 - b) : 1), a), []);
+  function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const gaussFrom = r => () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+  function data(n, seed) { const r = rng(seed), g = gaussFrom(r); return Array.from({ length: n }, () => { const m = MODES[Math.floor(r() * 8)]; return [m[0] + S0 * g(), m[1] + S0 * g()]; }); }
+  function forward(t, n, seed) {              // x_t = √ᾱ·x₀ + √(1−ᾱ)·ε
+    const g = gaussFrom(rng(seed + 77)), a = Math.sqrt(ABAR[t]), s = Math.sqrt(1 - ABAR[t]);
+    return data(n, seed).map(([x, y]) => [a * x + s * g(), a * y + s * g()]);
+  }
+  function score(p, t) {                      // ∇ log p_t(x): 노이즈 섞인 혼합분포라 정확히 계산됨
+    const a = Math.sqrt(ABAR[t]), v = ABAR[t] * S0 * S0 + 1 - ABAR[t];
+    const ls = MODES.map(m => -((p[0] - a * m[0]) ** 2 + (p[1] - a * m[1]) ** 2) / (2 * v)), mx = Math.max(...ls);
+    const w = ls.map(l => Math.exp(l - mx)), z = w.reduce((s, x) => s + x, 0);
+    return [0, 1].map(k => MODES.reduce((s, m, i) => s + w[i] / z * (a * m[k] - p[k]) / v, 0));
+  }
+  function reverse(n, seed) {                 // 반환: [t = T, T−1, …, 0]의 점들
+    const g = gaussFrom(rng(seed));
+    let x = Array.from({ length: n }, () => [g(), g()]);
+    const out = [x];
+    for (let t = T; t >= 1; t--) {
+      x = x.map(p => { const sc = score(p, t), c = 1 / Math.sqrt(1 - BETA[t]), sd = t > 1 ? Math.sqrt(BETA[t]) : 0; return [0, 1].map(k => c * (p[k] + BETA[t] * sc[k]) + sd * g()); });
+      out.push(x);
+    }
+    return out;
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  let mode = "fwd";
+  const traj = reverse(400, 2);
+  const X = x => 350 + x * 42, Y = y => 125 - y * 42;
+  function draw() {
+    const t = +I("t").value;
+    const tt = mode === "fwd" ? t : T - t;                   // 뒤로 모드에선 슬라이더가 진행도
+    const pts = mode === "fwd" ? forward(t, 400, 1) : traj[t];
+    I("tl").innerHTML = mode === "fwd" ? `노이즈 단계 t = <b>${t}</b>` : `생성 진행 <b>${t}</b>/${T} (t = ${tt})`;
+    let s = `<circle cx="${X(0)}" cy="${Y(0)}" r="${2 * 42}" fill="none" stroke="var(--line)" stroke-dasharray="3 4"/>`;
+    if (mode === "rev" && tt > 0) for (let gx = -4; gx <= 4; gx += 0.8) for (let gy = -2.6; gy <= 2.6; gy += 0.8) {
+      const sc = score([gx, gy], tt), L = Math.hypot(...sc), k = Math.min(0.35, 0.12 * L) / (L || 1);
+      s += `<line x1="${X(gx)}" y1="${Y(gy)}" x2="${X(gx + sc[0] * k)}" y2="${Y(gy + sc[1] * k)}" stroke="var(--warn)" stroke-width="1.5" opacity=".7"/><circle cx="${X(gx + sc[0] * k)}" cy="${Y(gy + sc[1] * k)}" r="1.6" fill="var(--warn)" opacity=".7"/>`;
+    }
+    pts.forEach(([x, y]) => s += `<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="2.2" fill="var(--accent)" opacity=".75"/>`);
+    s += `<text x="10" y="20" font-size="13" fill="var(--muted)">√ᾱ = ${Math.sqrt(ABAR[tt]).toFixed(2)} (데이터 남은 비율)</text><text x="10" y="38" font-size="13" fill="var(--muted)">√(1−ᾱ) = ${Math.sqrt(1 - ABAR[tt]).toFixed(2)} (노이즈 비율)</text>`;
+    svg.innerHTML = s;
+    I("cap").innerHTML = mode === "fwd"
+      ? (t < 15 ? `<b>앞으로</b>: 데이터(봉우리 8개)에 Gaussian 노이즈를 조금씩 섞음. 이 과정엔 학습할 게 없고, 어느 t에서든 한 번에 x_t를 만들 수 있음`
+        : t < 80 ? `t가 커질수록 봉우리가 번지고 섞임. 학습은 "x_t를 보고 섞인 노이즈 ε를 맞히기"(MSE) — 모든 t에서 무작위로 뽑아 학습`
+        : `t = T 근처면 거의 표준정규분포 — 데이터 흔적이 사라짐. 생성은 여기서 출발`)
+      : `<b>뒤로</b>: 순수 노이즈에서 출발해 매 단계 주황 화살표(score, 데이터가 더 그럴듯한 방향) 쪽으로 조금 움직이고 노이즈를 약간 더함. ${tt > 60 ? "처음엔 화살표가 원점 쪽으로 대충 모으고" : tt > 15 ? "중간엔 어느 봉우리로 갈지 정해지고" : "끝에선 각 봉우리로 또렷하게 모임"}`;
+  }
+  I("mode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.v; [...I("mode").children].forEach(x => x.classList.toggle("on", x === b));
+    I("t").value = 0; draw();
+  });
+  I("t").addEventListener("input", draw);
+  const h = location.hash.match(/^#(fwd|rev)(\d+)$/);
+  if (h) { if (h[1] === "rev") I("mode").children[1].click(); I("t").value = h[2]; }
+  draw();
+</script>
+</body>
+</html>

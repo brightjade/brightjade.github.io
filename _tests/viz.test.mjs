@@ -355,3 +355,16 @@ test("L1 hits the axis, L2 only shrinks", () => {
   const z = solve("l1", 0);
   assert.ok(Math.abs(z[0] - 2) < 1e-6 && Math.abs(z[1] - 0.6) < 1e-6);         // λ = 0이면 최소제곱 해
 });
+
+test("2D diffusion: forward to noise, reverse back to data", () => {
+  const { forward, reverse, MODES, T } = logic("diffusion-2d.html", "forward, reverse, MODES, T");
+  const noise = forward(T, 400, 1);
+  const mean = [0, 1].map(k => noise.reduce((s, p) => s + p[k], 0) / noise.length);
+  const sd = Math.sqrt(noise.reduce((s, p) => s + p[0] ** 2 + p[1] ** 2, 0) / (2 * noise.length));
+  assert.ok(Math.abs(mean[0]) < 0.2 && Math.abs(mean[1]) < 0.2 && sd > 0.85 && sd < 1.15);   // t = T면 거의 표준정규
+  const out = reverse(400, 2).at(-1);
+  const r = out.reduce((s, p) => s + Math.hypot(...p), 0) / out.length;
+  assert.ok(r > 1.7 && r < 2.3);                                                            // 원 위의 데이터로 돌아옴
+  const hit = new Set(out.map(p => MODES.reduce((b, m, i) => Math.hypot(p[0] - m[0], p[1] - m[1]) < Math.hypot(p[0] - MODES[b][0], p[1] - MODES[b][1]) ? i : b, 0)));
+  assert.ok(hit.size >= 7);                                                                 // 봉우리 대부분을 덮음
+});
