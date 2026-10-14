@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>MLE vs MAP</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;min-width:7.5em}#legend{display:flex;gap:2px 14px;flex-wrap:wrap;font-weight:600;font-size:14px}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div id="legend"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 220" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab">앞면 <b id="hv"></b>번</span><input type="range" id="h" min="0" max="30" step="1" value="3"></label>
+  <label class="row"><span class="lab">뒷면 <b id="tv"></b>번</span><input type="range" id="t" min="0" max="30" step="1" value="0"></label>
+  <label class="row"><span class="lab">prior 세기 <b id="av"></b></span><input type="range" id="a" min="1" max="30" step="1" value="10"></label>
+  <div style="color:var(--muted);font-size:12px">θ = 앞면 확률. prior는 Beta(a, a) — "동전은 대체로 공정하다"는 믿음, a가 클수록 강함(a = 1이면 평평한 uniform). 곡선은 모두 높이를 맞춰 그림.</div>
+</div>
+<script id="logic">
+  // 동전 h번 앞면, t번 뒷면. prior Beta(a, a) → posterior Beta(h + a, t + a)
+  function mle(h, t) { return h + t ? h / (h + t) : 0.5; }
+  function map(h, t, a) { return (h + a - 1) / (h + t + 2 * a - 2); }        // posterior의 봉우리(mode)
+  function postMean(h, t, a) { return (h + a) / (h + t + 2 * a); }
+  function logBeta(x, al, be) { return (al - 1) * Math.log(x) + (be - 1) * Math.log(1 - x); }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  const X = th => 40 + th * 640, Y0 = 195, H = 160;
+  function curve(lf, color, width, dash) {
+    const xs = Array.from({ length: 399 }, (_, i) => (i + 1) / 400), ls = xs.map(lf), mx = Math.max(...ls.filter(isFinite));
+    const pts = xs.map((x, i) => `${X(x).toFixed(1)},${(Y0 - (isFinite(ls[i]) ? Math.exp(ls[i] - mx) : 0) * H).toFixed(1)}`).join(" ");
+    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${width}" ${dash ? 'stroke-dasharray="5 4"' : ""}/>`;
+  }
+  const mark = (th, color, label, dy) => `<line x1="${X(th)}" x2="${X(th)}" y1="${Y0}" y2="22" stroke="${color}" stroke-width="2"/><text x="${Math.min(690, Math.max(10, X(th)))}" y="${16 + dy}" text-anchor="${th > 0.85 ? "end" : th < 0.15 ? "start" : "middle"}" font-size="13" font-weight="600" fill="${color}">${label}</text>`;
+  function draw() {
+    const h = +I("h").value, t = +I("t").value, a = +I("a").value;
+    I("hv").textContent = h; I("tv").textContent = t; I("av").textContent = a === 1 ? "1 (uniform)" : a;
+    const m1 = mle(h, t), m2 = map(h, t, a);
+    let s = `<line x1="40" x2="680" y1="${Y0}" y2="${Y0}" stroke="var(--line)"/>`;
+    for (const v of [0, 0.5, 1]) s += `<text x="${X(v)}" y="${Y0 + 18}" text-anchor="middle" font-size="12" fill="var(--muted)">θ = ${v}</text>`;
+    if (a > 1) s += curve(x => logBeta(x, a, a), "var(--muted)", 2, true);
+    s += curve(x => logBeta(x, h + 1, t + 1), "var(--warn)", 2.5);
+    s += curve(x => logBeta(x, h + a, t + a), "var(--accent)", 3);
+    const close = Math.abs(X(m1) - X(m2)) < 60;
+    s += mark(m1, "var(--warn)", `MLE ${m1.toFixed(2)}`, 0) + mark(m2, "var(--accent)", `MAP ${m2.toFixed(2)}`, close ? 17 : 0);
+    svg.innerHTML = s;
+    I("legend").innerHTML = `<span style="color:var(--warn)">likelihood θ^${h}(1−θ)^${t}</span>${a > 1 ? `<span style="color:var(--muted)">prior Beta(${a},${a})</span>` : ""}<span style="color:var(--accent)">posterior ∝ likelihood × prior</span>`;
+    const n = h + t;
+    I("cap").innerHTML = a === 1
+      ? `prior가 평평하면 posterior = likelihood → <b>MAP = MLE</b>. MLE는 "아무 사전 믿음도 없다"고 선언한 MAP`
+      : n <= 5
+        ? `데이터 ${n}개뿐이라 MLE는 ${m1.toFixed(2)}로 극단적 → prior가 MAP을 <b style="color:var(--accent)">${m2.toFixed(2)}</b>로 끌어당김. prior = 가상의 앞면 ${a - 1}번·뒷면 ${a - 1}번을 미리 본 것과 같음`
+        : `데이터 ${n}개가 쌓이자 likelihood가 prior를 압도해 MAP(${m2.toFixed(2)})이 MLE(${m1.toFixed(2)})에 가까워짐 — 차이는 데이터가 적을 때만 큼`;
+  }
+  ["h", "t", "a"].forEach(id => I(id).addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>

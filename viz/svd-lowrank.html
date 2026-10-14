@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SVD low-rank</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;align-items:center;min-height:0}
+.grid figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.grid canvas{width:100%;max-width:170px;aspect-ratio:1;image-rendering:pixelated;border:1px solid var(--line)}
+.grid figcaption{font-size:12px;color:var(--muted);text-align:center}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage grid">
+    <figure><canvas id="orig" width="64" height="64"></canvas><figcaption>원본 64×64</figcaption></figure>
+    <figure><canvas id="appr" width="64" height="64"></canvas><figcaption id="ac"></figcaption></figure>
+    <svg id="spec" viewBox="0 0 260 170" preserveAspectRatio="xMidYMid meet" style="width:100%"></svg>
+  </div>
+  <label class="row"><span class="lab">rank k <b id="kv"></b></span><input type="range" id="k" min="1" max="40" step="1" value="5"></label>
+  <div class="seg"><button id="noise">노이즈 섞기</button></div>
+  <div style="color:var(--muted);font-size:12px">A ≈ σ₁u₁v₁ᵀ + … + σₖuₖvₖᵀ. 축에 나란한 사각형·배경은 rank 1~2로 끝나고, 원·대각선은 많은 rank가 필요함.</div>
+</div>
+<script id="logic">
+  function jacobiEig(M) {                     // 대칭행렬 M = V diag(λ) Vᵀ
+    const n = M.length, A = M.map(r => r.slice()), V = M.map((_, i) => M.map((_, j) => +(i === j)));
+    for (let sweep = 0; sweep < 60; sweep++) {
+      let off = 0;
+      for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += A[p][q] ** 2;
+      if (off < 1e-24) break;
+      for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+        if (Math.abs(A[p][q]) < 1e-300) continue;
+        const th = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+        const t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let k = 0; k < n; k++) { const a = A[k][p], b = A[k][q]; A[k][p] = c * a - s * b; A[k][q] = s * a + c * b; }
+        for (let k = 0; k < n; k++) { const a = A[p][k], b = A[q][k]; A[p][k] = c * a - s * b; A[q][k] = s * a + c * b; }
+        for (let k = 0; k < n; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = c * a - s * b; V[k][q] = s * a + c * b; }
+      }
+    }
+    return { vals: A.map((r, i) => r[i]), V };
+  }
+  function svd(A) {                           // A (m×n, m ≥ n) = U diag(S) Vᵀ, S 내림차순
+    if (A.length < A[0].length) { const t = svd(A[0].map((_, j) => A.map(r => r[j]))); return { U: t.V, S: t.S, V: t.U }; }
+    const m = A.length, n = A[0].length;
+    const AtA = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => A.reduce((s, r) => s + r[i] * r[j], 0)));
+    const { vals, V } = jacobiEig(AtA);
+    const order = vals.map((v, i) => i).sort((a, b) => vals[b] - vals[a]);
+    const S = order.map(i => Math.sqrt(Math.max(vals[i], 0)));
+    const Vs = V.map(r => order.map(i => r[i]));
+    const U = A.map(r => S.map((s, c) => s > 1e-12 ? r.reduce((t, a, j) => t + a * Vs[j][c], 0) / s : 0));
+    return { U, S, V: Vs };
+  }
+  function reconstruct({ U, S, V }, k) {
+    return U.map(u => V.map(v => { let t = 0; for (let i = 0; i < k; i++) t += S[i] * u[i] * v[i]; return t; }));
+  }
+  function makeImage(n = 64, noise = 0) {
+    let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => {
+      let v = 0.12 + 0.18 * i / n;                                        // 세로 그라데이션: rank 1
+      if (i >= 8 && i < 26 && j >= 6 && j < 32) v = 0.92;                 // 축에 나란한 사각형: rank 1
+      if ((i - 42) ** 2 + (j - 42) ** 2 < 15 ** 2) v = 0.78;              // 원: 많은 rank
+      if (Math.abs(i - (n - 1 - j)) < 2 && i > 30 && j < 26) v = 1;        // 대각선: 많은 rank
+      return v + noise * (rnd() - 0.5);
+    }));
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id);
+  let noisy = false, cache = {};
+  function get() { const key = noisy ? "n" : "c"; if (!cache[key]) { const A = makeImage(64, noisy ? 0.35 : 0); cache[key] = { A, s: svd(A) }; } return cache[key]; }
+  function paint(id, M) {
+    const ctx = I(id).getContext("2d"), img = ctx.createImageData(64, 64);
+    M.flat().forEach((v, i) => { const g = Math.round(255 * Math.min(1, Math.max(0, v))); img.data.set([g, g, g, 255], i * 4); });
+    ctx.putImageData(img, 0, 0);
+  }
+  function draw() {
+    const k = +I("k").value, { A, s } = get(), R = reconstruct(s, k);
+    I("kv").textContent = k;
+    paint("orig", A); paint("appr", R);
+    const tot = s.S.reduce((t, x) => t + x * x, 0), kept = s.S.slice(0, k).reduce((t, x) => t + x * x, 0);
+    const store = k * (64 + 64 + 1);
+    I("ac").textContent = `rank ${k} 근사 · 숫자 ${store}개 (${Math.round(store / 4096 * 100)}%)`;
+    const L = v => Math.log10(Math.max(v, 1e-3)), top = L(s.S[0]), bot = -1.5;
+    const Y = v => 20 + (top - L(v)) / (top - bot) * 125, X = i => 34 + i / 63 * 216;
+    let g = `<text x="34" y="12" font-size="12" fill="var(--muted)">특이값 σᵢ (로그 눈금)</text><line x1="34" x2="250" y1="145" y2="145" stroke="var(--line)"/>`;
+    s.S.forEach((v, i) => g += `<circle cx="${X(i)}" cy="${Math.min(145, Y(v))}" r="2.2" fill="${i < k ? "var(--accent)" : "var(--muted)"}"/>`);
+    g += `<line x1="${X(k - 0.5)}" x2="${X(k - 0.5)}" y1="18" y2="145" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="250" y="162" text-anchor="end" font-size="12" fill="var(--muted)">i = 1 … 64</text>`;
+    I("spec").innerHTML = g;
+    I("cap").innerHTML = noisy
+      ? `노이즈는 모든 방향에 고르게 퍼져 <b>작은 특이값들의 바닥</b>을 만듦 → 앞의 k개만 남기면 구조는 남고 노이즈는 상당 부분 걸러짐 (k ≈ 10 근처를 볼 것)`
+      : `앞의 특이값 ${k}개가 에너지(Σσ²)의 <b>${(kept / tot * 100).toFixed(1)}%</b> — 숫자 ${Math.round(store / 4096 * 100)}%만으로 대부분을 재현. 그래서 압축·추천(행렬 분해)·LoRA·PCA가 모두 저랭크 근사를 씀`;
+  }
+  I("k").addEventListener("input", draw);
+  I("noise").addEventListener("click", e => { noisy = !noisy; e.target.classList.toggle("on", noisy); draw(); });
+  if (location.hash === "#noise") I("noise").click(); else draw();
+</script>
+</body>
+</html>

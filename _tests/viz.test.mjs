@@ -287,3 +287,44 @@ test("arch failure paths go straight when nothing is in the way", () => {
   assert.equal(blocked([100, 20, 300, 20], [mid]), true);
   assert.equal(blocked([100, 20, 300, 20], [{ x: 150, y: 100, w: 100, h: 40 }]), false);
 });
+
+test("MLE vs MAP with a Beta prior", () => {
+  const { mle, map, postMean } = logic("mle-map.html", "mle, map, postMean");
+  assert.equal(mle(3, 0), 1);
+  assert.ok(Math.abs(map(3, 0, 10) - 12 / 21) < 1e-12);           // Beta(10,10)이면 0.57로 끌려옴
+  assert.ok(Math.abs(map(7, 3, 1) - mle(7, 3)) < 1e-12);          // uniform prior면 MAP = MLE
+  assert.ok(Math.abs(map(300, 100, 10) - mle(300, 100)) < Math.abs(map(3, 1, 10) - mle(3, 1)));   // 데이터가 많으면 수렴
+  assert.ok(Math.abs(postMean(3, 0, 10) - 13 / 23) < 1e-12);      // mode와 mean은 다름
+});
+
+test("KL asymmetry: forward covers, reverse seeks a mode", () => {
+  const { kl, p, best } = logic("kl-asymmetry.html", "kl, p, best");
+  const f = best("forward", 2), r = best("reverse", 2);
+  assert.ok(Math.abs(f.mu) < 0.3 && f.sigma > 1.5);                // 두 봉우리를 다 덮도록 퍼짐
+  assert.ok(Math.abs(r.mu) > 1.5 && r.sigma < 1);                  // 한 봉우리에 붙음
+  const q = x => p(x, 2);
+  assert.ok(Math.abs(kl(x => p(x, 2), q)) < 1e-9);
+  assert.ok(kl(x => p(x, 2), x => Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI)) > 0);
+});
+
+test("two-coin Bayes update", () => {
+  const { posterior, predictive } = logic("bayes-coins.html", "posterior, predictive");
+  assert.ok(Math.abs(posterior("H", 0.5, 0.9) - 9 / 14) < 1e-12);  // 앞면 한 번 → 치우친 동전 9/14
+  assert.ok(Math.abs(posterior("T", 0.5, 0.9) - 1 / 6) < 1e-12);
+  assert.ok(Math.abs(predictive("", 0.5, 0.9) - 0.7) < 1e-12);
+  assert.ok(Math.abs(predictive("H", 0.5, 0.9) - 10.6 / 14) < 1e-12);   // 0.757 ≠ 0.7 → 독립 아님
+});
+
+test("SVD low-rank approximation", () => {
+  const { svd, reconstruct } = logic("svd-lowrank.html", "svd, reconstruct");
+  const A = [[3, 1, 2], [1, 4, 0], [2, 0, 5], [1, 1, 1]];
+  const s = svd(A);
+  for (let i = 1; i < s.S.length; i++) assert.ok(s.S[i - 1] >= s.S[i]);   // 내림차순
+  const full = reconstruct(s, 3), err = (B, k) => Math.sqrt(A.flat().reduce((t, v, i) => t + (v - B.flat()[i]) ** 2, 0));
+  assert.ok(err(full) < 1e-9);
+  const r1 = reconstruct(s, 1);
+  assert.ok(Math.abs(err(r1) - Math.hypot(s.S[1], s.S[2])) < 1e-9);       // Eckart–Young: 남은 특이값만큼의 오차
+  const u = [1, 2, 3], v = [2, -1];
+  const R = u.map(a => v.map(b => a * b));
+  assert.ok(svd(R).S[1] < 1e-9);                                           // rank-1 행렬은 특이값 하나
+});

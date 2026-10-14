@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>KL asymmetry</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;min-width:6.5em}.seg{display:flex;gap:6px;flex-wrap:wrap}#legend{display:flex;gap:2px 14px;flex-wrap:wrap;font-weight:600;font-size:14px}</style>
+</head>
+<body><div id="app">
+  <div class="seg"><button id="fwd">forward KL(p‖q)로 맞추기</button><button id="rev">reverse KL(q‖p)로 맞추기</button></div>
+  <div class="caption" id="cap"></div>
+  <div id="legend"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab">q의 평균 <b id="mv"></b></span><input type="range" id="mu" min="-4" max="4" step="0.05" value="0"></label>
+  <label class="row"><span class="lab">q의 폭 σ <b id="sv"></b></span><input type="range" id="sg" min="0.2" max="3.5" step="0.05" value="1"></label>
+  <label class="row"><span class="lab">봉우리 간격 <b id="dv"></b></span><input type="range" id="d" min="0.5" max="3" step="0.1" value="2"></label>
+</div>
+<script id="logic">
+  // p: 봉우리 두 개(±d, 폭 0.6)짜리 진짜 분포, q: 봉우리 하나인 Gaussian 근사
+  const XS = Array.from({ length: 701 }, (_, i) => -7 + i * 0.02), DX = 0.02;
+  function gauss(x, mu, s) { return Math.exp(-0.5 * ((x - mu) / s) ** 2) / (s * Math.sqrt(2 * Math.PI)); }
+  function p(x, d) { return 0.5 * gauss(x, -d, 0.6) + 0.5 * gauss(x, d, 0.6); }
+  function kl(P, Q) {          // KL(P‖Q) = Σ P log(P/Q)
+    let s = 0;
+    for (const x of XS) { const a = P(x); if (a > 1e-300) s += a * Math.log(a / Math.max(Q(x), 1e-300)) * DX; }
+    return s;
+  }
+  function best(dir, d) {
+    let out = { v: Infinity };
+    for (let mu = -4; mu <= 4.001; mu += 0.1) for (let s = 0.2; s <= 3.501; s += 0.05) {
+      const P = x => p(x, d), Q = x => gauss(x, mu, s);
+      const v = dir === "forward" ? kl(P, Q) : kl(Q, P);
+      if (v < out.v) out = { v, mu, sigma: s };
+    }
+    return out;
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  let mode = "manual";
+  const X = x => 20 + (x + 6) / 12 * 660, Y = v => 180 - v * 230;
+  const path = f => XS.filter(x => x >= -6 && x <= 6).map((x, i) => `${i ? "L" : "M"}${X(x).toFixed(1)},${Math.max(4, Y(f(x))).toFixed(1)}`).join("");
+  function draw() {
+    const mu = +I("mu").value, s = +I("sg").value, d = +I("d").value;
+    I("mv").textContent = mu.toFixed(2); I("sv").textContent = s.toFixed(2); I("dv").textContent = "±" + d.toFixed(1);
+    const P = x => p(x, d), Q = x => gauss(x, mu, s);
+    const fw = kl(P, Q), rv = kl(Q, P);
+    svg.innerHTML = `<line x1="20" x2="680" y1="180" y2="180" stroke="var(--line)"/>
+      <path d="${path(P)} L${X(6)},180 L${X(-6)},180 Z" fill="var(--good)" opacity=".25"/>
+      <path d="${path(P)}" fill="none" stroke="var(--good)" stroke-width="2"/>
+      <path d="${path(Q)}" fill="none" stroke="var(--accent)" stroke-width="3"/>`;
+    I("legend").innerHTML = `<span style="color:var(--good)">p (진짜, 봉우리 2개)</span><span style="color:var(--accent)">q (근사, 봉우리 1개)</span><span>forward ${fw > 20 ? "> 20" : fw.toFixed(2)}</span><span>reverse ${rv > 20 ? "> 20" : rv.toFixed(2)}</span>`;
+    I("cap").innerHTML = mode === "forward"
+      ? `<b>forward KL(p‖q)</b>: p가 있는데 q가 0에 가까우면 log(p/q)가 폭발 → q가 두 봉우리를 <b>다 덮도록 퍼짐</b>(mass-covering). 대신 아무것도 없는 가운데에도 확률을 줌. MLE·SFT·distillation이 이 방향`
+      : mode === "reverse"
+        ? `<b>reverse KL(q‖p)</b>: q가 있는데 p가 0에 가까우면 벌점 → 봉우리 사이 빈 곳을 피해 <b>한 봉우리에만 붙음</b>(mode-seeking). 다른 봉우리는 통째로 놓침. RL의 KL 패널티·변분추론이 이 방향`
+        : `q를 직접 움직여 볼 것: 가운데에 넓게 두면 forward가 작고, 한 봉우리에 좁게 두면 reverse가 작음 — 같은 q라도 두 값이 다름(KL은 비대칭)`;
+  }
+  function fit(dir) {
+    mode = dir;
+    const b = best(dir, +I("d").value);
+    I("mu").value = b.mu; I("sg").value = b.sigma; draw();
+  }
+  I("fwd").addEventListener("click", () => fit("forward"));
+  I("rev").addEventListener("click", () => fit("reverse"));
+  ["mu", "sg"].forEach(id => I(id).addEventListener("input", () => { mode = "manual"; draw(); }));
+  I("d").addEventListener("input", () => mode === "manual" ? draw() : fit(mode));
+  const start = location.hash.slice(1);
+  start === "forward" || start === "reverse" ? fit(start) : draw();
+</script>
+</body>
+</html>

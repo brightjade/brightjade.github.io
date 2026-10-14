@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Two coins</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;flex:none}.seg{display:flex;gap:6px;flex-wrap:wrap;align-items:center}#seq{font-weight:600;letter-spacing:2px}#calc{font-size:14px}</style>
+</head>
+<body><div id="app">
+  <div class="seg"><button id="bh">앞면 H 던지기</button><button id="bt">뒷면 T 던지기</button><button id="br">처음부터</button><span>관측: <span id="seq"></span></span></div>
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 190" preserveAspectRatio="xMidYMid meet"></svg>
+  <div id="calc"></div>
+  <label class="row"><span class="lab">사전확률 P(치우침) <b id="pv"></b></span><input type="range" id="pb" min="0.05" max="0.95" step="0.05" value="0.5"></label>
+  <label class="row"><span class="lab">치우친 동전 앞면 <b id="bv"></b></span><input type="range" id="b" min="0.55" max="0.99" step="0.01" value="0.9"></label>
+</div>
+<script id="logic">
+  // 공정한 동전(0.5)과 앞면 확률 b인 치우친 동전 중 사전확률 pb로 하나를 집음
+  function lik(flips, q) { let l = 1; for (const c of flips) l *= c === "H" ? q : 1 - q; return l; }
+  function posterior(flips, pb, b) {          // P(치우친 동전 | 관측)
+    const jb = pb * lik(flips, b), jf = (1 - pb) * lik(flips, 0.5);
+    return jb / (jb + jf);
+  }
+  function predictive(flips, pb, b) {         // P(다음이 앞면 | 관측)
+    const post = posterior(flips, pb, b);
+    return post * b + (1 - post) * 0.5;
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  let flips = "H";
+  const f3 = v => v.toFixed(3);
+  function draw() {
+    const pb = +I("pb").value, b = +I("b").value;
+    I("pv").textContent = pb.toFixed(2); I("bv").textContent = b.toFixed(2);
+    I("seq").textContent = flips || "(없음)";
+    const Lf = lik(flips, 0.5), Lb = lik(flips, b), sc = 150 / Math.max(Lf, Lb), W = 640, wf = (1 - pb) * W, wb = pb * W;
+    const post = posterior(flips, pb, b);
+    svg.innerHTML = `
+      <rect x="30" y="20" width="${wf}" height="150" fill="none" stroke="var(--line)"/>
+      <rect x="${30 + wf}" y="20" width="${wb}" height="150" fill="none" stroke="var(--line)"/>
+      <rect x="30" y="${170 - Lf * sc}" width="${wf}" height="${Lf * sc}" fill="var(--muted)" opacity=".55"/>
+      <rect x="${30 + wf}" y="${170 - Lb * sc}" width="${wb}" height="${Lb * sc}" fill="var(--accent)" opacity=".8"/>
+      <text x="${30 + wf / 2}" y="186" text-anchor="middle" font-size="13" fill="var(--muted)">공정한 동전 (폭 = 사전확률 ${(1 - pb).toFixed(2)})</text>
+      <text x="${30 + wf + wb / 2}" y="186" text-anchor="middle" font-size="13" fill="var(--accent)">치우친 동전 (폭 ${pb.toFixed(2)})</text>
+      <text x="${30 + wf / 2}" y="${Math.max(36, 162 - Lf * sc)}" text-anchor="middle" font-size="14" font-weight="600" fill="var(--fg)">넓이 ${f3((1 - pb) * Lf)}</text>
+      <text x="${30 + wf + wb / 2}" y="${Math.max(36, 162 - Lb * sc)}" text-anchor="middle" font-size="14" font-weight="600" fill="var(--fg)">넓이 ${f3(pb * Lb)}</text>`;
+    I("calc").innerHTML = flips
+      ? `P(치우친 | ${flips}) = ${f3(pb * Lb)} / (${f3(pb * Lb)} + ${f3((1 - pb) * Lf)}) = <b style="color:var(--accent)">${f3(post)}</b> · 공정한 동전일 확률 ${f3(1 - post)}`
+      : `아직 관측이 없어 사전확률 그대로: 치우친 동전 ${pb.toFixed(2)}`;
+    const before = predictive("", pb, b), now = predictive(flips, pb, b);
+    I("cap").innerHTML = flips
+      ? `색칠한 넓이 = 사전확률 × 관측의 likelihood. 관측 뒤엔 색칠한 부분만 남으니 그 비율이 posterior. 다음이 앞면일 확률: 관측 전 ${f3(before)} → 지금 <b>${f3(now)}</b> — 앞 결과가 뒤 예측을 바꾸므로 <b>독립 아님</b>(어느 동전인지 알면 독립)`
+      : `세로 높이 = 그 동전이 지금까지의 관측을 낼 확률(likelihood). 던질 때마다 높이가 곱해져 바뀜`;
+  }
+  I("bh").addEventListener("click", () => { flips = (flips + "H").slice(-12); draw(); });
+  I("bt").addEventListener("click", () => { flips = (flips + "T").slice(-12); draw(); });
+  I("br").addEventListener("click", () => { flips = ""; draw(); });
+  ["pb", "b"].forEach(id => I(id).addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>
