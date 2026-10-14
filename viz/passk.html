@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>pass@k</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 270" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">RL이 좁히는 정도 <b id="sv"></b></span><input type="range" id="s" min="0" max="1" step="0.05" value="0.8"></label>
+  <div style="color:var(--muted);font-size:12px">문제 200개, 문제마다 한 번에 맞힐 확률 p. pass@k = 1 − (1 − p)^k 의 평균. 숫자는 설명용 (Yue et al. 2025의 관찰을 흉내 낸 모형).</div>
+</div>
+<script id="logic">
+  // base: 쉬운 문제부터 거의 못 푸는 문제까지 고르게. RL(s): 원래 풀던 문제는 더 확실히, 거의 못 풀던 문제는 버림.
+  function problems(s) {
+    return Array.from({length: 200}, (_, i) => {
+      const p = (i / 199) ** 3;
+      return p >= 0.1 ? p + s * 0.8 * (1 - p) : p * (1 - s) ** 2;
+    });
+  }
+  function passAtK(ps, k) { return ps.reduce((a, p) => a + 1 - (1 - p) ** k, 0) / ps.length; }
+</script>
+<script>
+  const svg = document.getElementById("plot"), slider = document.getElementById("s"), KS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+  const X = k => 60 + Math.log2(k) / 8 * 600, Y = v => 230 - v * 210;
+  const line = (ps, color, w) => `<path d="${KS.map((k, i) => `${i ? "L" : "M"}${X(k)},${Y(passAtK(ps, k))}`).join("")}" fill="none" stroke="${color}" stroke-width="${w}"/>` +
+    KS.map(k => `<circle cx="${X(k)}" cy="${Y(passAtK(ps, k))}" r="3" fill="${color}"/>`).join("");
+  function draw() {
+    const s = +slider.value, base = problems(0), rl = problems(s);
+    document.getElementById("sv").textContent = s.toFixed(2);
+    svg.innerHTML = `<line x1="60" y1="230" x2="660" y2="230" stroke="var(--line)"/><line x1="60" y1="20" x2="60" y2="230" stroke="var(--line)"/>` +
+      KS.map(k => `<text x="${X(k)}" y="248" text-anchor="middle" font-size="11" fill="var(--muted)">${k}</text>`).join("") +
+      `<text x="660" y="264" text-anchor="end" font-size="12" fill="var(--muted)">k (샘플 수, log)</text>` +
+      `<text x="54" y="${Y(1) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">100%</text><text x="54" y="${Y(0) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">0</text>` +
+      line(base, "var(--muted)", 2) + line(rl, "var(--accent)", 2.5) +
+      `<text x="${X(1) + 6}" y="${Y(passAtK(rl, 1)) - 8}" font-size="12" fill="var(--accent)">RL 모델</text>` +
+      `<text x="${X(256) - 4}" y="${Y(passAtK(base, 256)) - 8}" text-anchor="end" font-size="12" fill="var(--muted)">base 모델</text>`;
+    const p1 = [passAtK(base, 1), passAtK(rl, 1)], p256 = [passAtK(base, 256), passAtK(rl, 256)];
+    document.getElementById("cap").innerHTML = `pass@1: base ${(p1[0] * 100).toFixed(0)}% → RL <b>${(p1[1] * 100).toFixed(0)}%</b> · pass@256: base <b>${(p256[0] * 100).toFixed(0)}%</b> vs RL ${(p256[1] * 100).toFixed(0)}% — 한 번에는 RL이 낫지만 여러 번 뽑으면 base가 더 많은 문제를 풂`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>

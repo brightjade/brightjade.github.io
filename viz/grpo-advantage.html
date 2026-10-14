@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>GRPO advantage</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="seg" id="samples"></div>
+  <div class="seg" id="mode"><button data-std="1">GRPO: std로 나눔</button><button data-std="0">Dr. GRPO: 안 나눔</button></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 220" preserveAspectRatio="xMidYMid meet"></svg>
+  <div style="color:var(--muted);font-size:12px">같은 문제에 답 8개를 샘플링. 버튼을 눌러 정답(✓)/오답(✗)을 바꿔 볼 것. advantage = 그룹 평균보다 얼마나 나았나.</div>
+</div>
+<script id="logic">
+  function advantages(rs, useStd) {
+    const n = rs.length, m = rs.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(rs.reduce((a, b) => a + (b - m) ** 2, 0) / n);
+    return rs.map(r => useStd ? (sd > 0 ? (r - m) / sd : 0) : r - m);
+  }
+</script>
+<script>
+  let rs = [1, 0, 0, 0, 0, 0, 0, 0], useStd = true;
+  const box = document.getElementById("samples"), mode = document.getElementById("mode"), svg = document.getElementById("plot");
+  box.onclick = e => { const i = e.target.dataset.i; if (i !== undefined) { rs[i] = 1 - rs[i]; draw(); } };
+  mode.onclick = e => { if (e.target.dataset.std !== undefined) { useStd = e.target.dataset.std === "1"; draw(); } };
+  function draw() {
+    box.innerHTML = rs.map((r, i) => `<button data-i="${i}" style="color:${r ? "var(--good)" : "var(--bad)"}">${r ? "✓" : "✗"}</button>`).join("");
+    [...mode.children].forEach(b => b.classList.toggle("on", (b.dataset.std === "1") === useStd));
+    const A = advantages(rs, useStd), Y0 = 110, S = 30;
+    svg.innerHTML = `<line x1="40" y1="${Y0}" x2="680" y2="${Y0}" stroke="var(--line)"/>` + A.map((a, i) => {
+      const h = Math.max(-100, Math.min(100, a * S)), x = 60 + i * 78;
+      return `<rect x="${x}" y="${h > 0 ? Y0 - h : Y0}" width="50" height="${Math.abs(h)}" fill="${a > 0 ? "var(--good)" : "var(--bad)"}" opacity=".8"/>` +
+        `<text x="${x + 25}" y="${h >= 0 ? Y0 + 16 : Y0 - 6}" text-anchor="middle" font-size="12" fill="var(--fg)">${a.toFixed(2)}</text>`;
+    }).join("");
+    const k = rs.reduce((a, b) => a + b, 0);
+    document.getElementById("cap").innerHTML = k === 0 || k === rs.length
+      ? `모두 ${k ? "정답" : "오답"} → advantage가 전부 0, 이 문제에선 배울 게 없음 (DAPO는 이런 그룹을 빼고 다시 뽑음)`
+      : useStd ? `정답 ${k}/8 — std로 나누면 정답이 드물수록(또는 흔할수록) 값이 부풀어, 너무 쉽거나 어려운 문제에 가중치가 쏠림`
+      : `정답 ${k}/8 — std로 안 나누면 크기가 평균과의 차이 그대로라 문제 난이도에 덜 휘둘림 (Dr. GRPO)`;
+  }
+  draw();
+</script>
+</body>
+</html>

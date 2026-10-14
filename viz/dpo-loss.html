@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>DPO loss</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 260" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">margin m = <b id="mv"></b></span><input type="range" id="m" min="-6" max="6" step="0.1" value="0"></label>
+  <div style="color:var(--muted);font-size:12px">m = β·[log(π<sub>θ</sub>/π<sub>ref</sub>)(이긴 답) − log(π<sub>θ</sub>/π<sub>ref</sub>)(진 답)] — 참조 모델보다 이긴 답을 얼마나 더 밀어 올렸나</div>
+</div>
+<script id="logic">
+  const sig = x => 1 / (1 + Math.exp(-x));
+  function loss(m) { return -Math.log(sig(m)); }       // DPO loss = −log σ(m)
+  function weight(m) { return sig(-m); }               // gradient 크기 = σ(−m): 아직 덜 배운 쌍일수록 큼
+</script>
+<script>
+  const svg = document.getElementById("plot"), slider = document.getElementById("m");
+  const X = m => 60 + (m + 6) / 12 * 600, Y = v => 220 - v / 6.5 * 200;
+  const path = f => Array.from({length: 121}, (_, i) => { const m = -6 + i / 10; return `${i ? "L" : "M"}${X(m)},${Y(f(m))}`; }).join("");
+  function draw() {
+    const m = +slider.value;
+    document.getElementById("mv").textContent = m.toFixed(1);
+    svg.innerHTML = `
+      <line x1="60" y1="220" x2="660" y2="220" stroke="var(--line)"/><line x1="${X(0)}" y1="15" x2="${X(0)}" y2="220" stroke="var(--line)"/>
+      <path d="${path(loss)}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <path d="${path(m => 4 * weight(m))}" fill="none" stroke="var(--warn)" stroke-width="2.5"/>
+      <text x="650" y="28" text-anchor="end" font-size="12" fill="var(--accent)">━ loss = −log σ(m)</text>
+      <text x="650" y="46" text-anchor="end" font-size="12" fill="var(--warn)">━ gradient 가중치 σ(−m) (×4로 그림)</text>
+      <circle cx="${X(m)}" cy="${Y(loss(m))}" r="6" fill="var(--accent)"/><circle cx="${X(m)}" cy="${Y(4 * weight(m))}" r="6" fill="var(--warn)"/>
+      <text x="660" y="240" text-anchor="end" font-size="12" fill="var(--muted)">m →</text>
+      <text x="${X(0)}" y="240" text-anchor="middle" font-size="11" fill="var(--muted)">0</text>`;
+    document.getElementById("cap").innerHTML = m < -0.5
+      ? `m < 0: 정책이 오히려 <b>진 답</b>을 더 좋아함 → 가중치 ${weight(m).toFixed(2)}로 세게 고침`
+      : m > 2 ? `m이 크면 이미 배운 쌍 → 가중치 ${weight(m).toFixed(2)}, 거의 안 밀어 줌 (자동 조절)`
+      : `m ≈ 0: 아직 구분 못 함 → 가중치 ${weight(m).toFixed(2)}`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>

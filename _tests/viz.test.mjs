@@ -45,3 +45,44 @@ test("context budget model", () => {
   assert.ok(sub.at(-1) < compact.at(-1) || Math.max(...sub) < Math.max(...compact));
   assert.equal(naive.length, 41);                          // 0단계 포함
 });
+
+function logic(file, names) {
+  const html = readFileSync(new URL(`../viz/${file}`, import.meta.url), "utf8");
+  const code = /<script id="logic">([\s\S]*?)<\/script>/.exec(html)[1];
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(code + `\n;globalThis.api = { ${names} };`, ctx);
+  return ctx.api;
+}
+
+test("baseline keeps the mean and cuts variance", () => {
+  const { estimates, stats } = logic("baseline-variance.html", "estimates, stats");
+  const noB = stats(estimates(10, false, 4000, 7)), withB = stats(estimates(10, true, 4000, 7));
+  assert.ok(Math.abs(noB.mean - withB.mean) < 0.15);       // 둘 다 같은 기댓값(불편)
+  assert.ok(withB.variance < noB.variance / 5);            // 보상을 크게 밀면 baseline 없는 쪽 분산이 폭발
+});
+
+test("dpo loss and weight", () => {
+  const { loss, weight } = logic("dpo-loss.html", "loss, weight");
+  assert.ok(loss(-2) > loss(0) && loss(0) > loss(2));
+  assert.ok(Math.abs(weight(0) - 0.5) < 1e-9);
+  assert.ok(weight(5) < 0.01 && weight(-5) > 0.99);
+});
+
+test("grpo advantages", () => {
+  const { advantages } = logic("grpo-advantage.html", "advantages");
+  assert.deepEqual([...advantages([1, 1, 1, 1], true)], [0, 0, 0, 0]);   // 다 같으면 신호 없음
+  const rare = advantages([1, 0, 0, 0, 0, 0, 0, 0], true)[0], half = advantages([1, 1, 1, 1, 0, 0, 0, 0], true)[0];
+  assert.ok(rare > 2 * half);                                               // std로 나누면 드문 성공이 크게 부풀음
+  const rareDr = advantages([1, 0, 0, 0, 0, 0, 0, 0], false)[0], halfDr = advantages([1, 1, 1, 1, 0, 0, 0, 0], false)[0];
+  assert.ok(rareDr < 2 * halfDr);
+  assert.ok(Math.abs(advantages([1, 0, 1, 0, 0], true).reduce((a, b) => a + b, 0)) < 1e-9);
+});
+
+test("pass@k curves cross", () => {
+  const { passAtK, problems } = logic("passk.html", "passAtK, problems");
+  const base = problems(0), rl = problems(0.8);
+  assert.ok(passAtK(rl, 1) > passAtK(base, 1));
+  assert.ok(passAtK(base, 256) > passAtK(rl, 256));
+  assert.ok(passAtK(base, 8) > passAtK(base, 2));
+});
