@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Training budget</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="plot" style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-content:center"></div>
+  <label class="row"><span style="white-space:nowrap">파라미터 N <b id="nv"></b></span><input type="range" id="n" min="9" max="12" step="0.05" value="10.85"></label>
+  <label class="row"><span style="white-space:nowrap">토큰 D <b id="dv"></b></span><input type="range" id="d" min="11" max="13.5" step="0.05" value="13.18"></label>
+  <label class="row"><span style="white-space:nowrap">MFU <b id="mv"></b></span><input type="range" id="m" min="0.2" max="0.6" step="0.05" value="0.4"></label>
+  <label class="row"><span style="white-space:nowrap">GPU 수 <b id="gv"></b></span><input type="range" id="g" min="6" max="14" step="1" value="10"></label>
+  <div style="color:var(--muted);font-size:12px">H100 BF16 dense 약 989 TFLOP/s 기준. 학습 FLOPs = 6ND. 메모리 = mixed-precision Adam 16 bytes/파라미터(가중치 2 + gradient 2 + FP32 master·m·v 12), activation 제외.</div>
+</div>
+<script id="logic">
+  function budget(N, D, peak, mfu, gpus) {
+    const flops = 6 * N * D, gpuSeconds = flops / (peak * mfu), memBytes = 16 * N;
+    return { flops, gpuDays: gpuSeconds / 86400, wallDays: gpuSeconds / 86400 / gpus, memBytes, perGpu: memBytes / gpus };
+  }
+</script>
+<script>
+  const svg = document.getElementById("plot"), I = id => document.getElementById(id);
+  const big = n => n >= 1e12 ? (n / 1e12).toFixed(1) + "T" : n >= 1e9 ? (n / 1e9).toFixed(0) + "B" : n.toFixed(0);
+  function draw() {
+    const N = 10 ** +I("n").value, D = 10 ** +I("d").value, mfu = +I("m").value, G = 2 ** +I("g").value;
+    const b = budget(N, D, 989e12, mfu, G);
+    I("nv").textContent = big(N); I("dv").textContent = big(D); I("mv").textContent = (mfu * 100).toFixed(0) + "%"; I("gv").textContent = G;
+    const row = (label, value, color) => `<div style="color:var(--muted)">${label}</div><div style="text-align:right;font-weight:600;color:${color}">${value}</div>`;
+    svg.innerHTML = row("학습 FLOPs (6ND)", b.flops.toExponential(2), "var(--fg)") +
+      row("GPU-일", Math.round(b.gpuDays).toLocaleString() + " GPU-day", "var(--accent)") +
+      row(`${G}장으로 걸리는 시간`, b.wallDays.toFixed(1) + "일", "var(--good)") +
+      row("Adam 상태 메모리 (전체 / GPU당 완전 샤딩)", (b.memBytes / 1e12).toFixed(2) + "TB / " + (b.perGpu / 1e9).toFixed(1) + "GB", b.perGpu > 80e9 ? "var(--bad)" : "var(--warn)");
+    I("cap").innerHTML = `${big(N)} × ${big(D)} 토큰: 토큰/파라미터 ≈ ${(D / N).toFixed(0)} · 파라미터당 16바이트라 가중치·optimizer만으로 ${(b.memBytes / 1e12).toFixed(2)}TB → FSDP/ZeRO로 나눠야 함`;
+  }
+  ["n", "d", "m", "g"].forEach(id => I(id).addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>

@@ -137,3 +137,29 @@ test("decoding filters", () => {
   const p = process(L, 1, 8, 0.5);
   assert.ok(p.filter(x => x > 0).length < 8);                   // top-p가 꼬리를 자름
 });
+
+test("kv cache size", () => {
+  const { kvBytes } = logic("kv-cache.html", "kvBytes");
+  const gqa = kvBytes({ layers: 80, kvHeads: 8, headDim: 128, seq: 32768, batch: 1, bytes: 2, mode: "gqa" });
+  assert.ok(Math.abs(gqa / 1e9 - 10.7) < 0.2);                   // 70B·GQA·32K·BF16 ≈ 10.7GB
+  const mha = kvBytes({ layers: 80, kvHeads: 64, headDim: 128, seq: 32768, batch: 1, bytes: 2, mode: "mha" });
+  assert.ok(Math.abs(mha / gqa - 8) < 1e-9);
+  const mla = kvBytes({ layers: 80, kvHeads: 64, headDim: 128, seq: 32768, batch: 1, bytes: 2, mode: "mla" });
+  assert.ok(mla < gqa);
+});
+
+test("speculative decoding speedup", () => {
+  const { expectedTokens, speedup } = logic("spec-decoding.html", "expectedTokens, speedup");
+  assert.ok(Math.abs(expectedTokens(0, 4) - 1) < 1e-9);
+  assert.ok(Math.abs(expectedTokens(0.5, 1) - 1.5) < 1e-9);
+  assert.ok(speedup(0.8, 4, 0.05) > speedup(0.5, 4, 0.05));
+  assert.ok(speedup(0.8, 4, 0.05) > speedup(0.8, 30, 0.05));     // 너무 길게 추측하면 손해
+});
+
+test("training budget", () => {
+  const { budget } = logic("train-budget.html", "budget");
+  const b = budget(70e9, 15e12, 989e12, 0.4, 1024);
+  assert.ok(Math.abs(b.flops - 6.3e24) / 6.3e24 < 1e-9);
+  assert.ok(b.gpuDays > 1.7e5 && b.gpuDays < 2.0e5);
+  assert.ok(Math.abs(b.memBytes - 1.12e12) < 1e9);               // 16 bytes/param
+});

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>KV cache size</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="seg" id="mode"><button data-m="mha">MHA (64 KV head)</button><button data-m="gqa">GQA (8 KV head)</button><button data-m="mla">MLA (latent 512+64)</button></div>
+  <div class="seg" id="prec"><button data-b="2">BF16</button><button data-b="1">FP8</button></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 150" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">문맥 길이 <b id="sv"></b></span><input type="range" id="s" min="10" max="20" step="0.5" value="15"></label>
+  <label class="row"><span style="white-space:nowrap">배치(동시 요청) <b id="bv"></b></span><input type="range" id="b" min="0" max="6" step="1" value="0"></label>
+  <div style="color:var(--muted);font-size:12px">70B급 모델(80층, head 차원 128) 기준. KV cache = 2(K,V) × 층 × KV head × head 차원 × 길이 × 배치 × 바이트. 점선 = GPU 한 장 80GB.</div>
+</div>
+<script id="logic">
+  function kvBytes({ layers, kvHeads, headDim, seq, batch, bytes, mode }) {
+    if (mode === "mla") return layers * (512 + 64) * seq * batch * bytes;   // latent만 캐시
+    return 2 * layers * kvHeads * headDim * seq * batch * bytes;
+  }
+</script>
+<script>
+  let mode = "gqa", bytes = 2;
+  const svg = document.getElementById("plot"), S = document.getElementById("s"), B = document.getElementById("b");
+  document.getElementById("mode").onclick = e => { if (e.target.dataset.m) { mode = e.target.dataset.m; draw(); } };
+  document.getElementById("prec").onclick = e => { if (e.target.dataset.b) { bytes = +e.target.dataset.b; draw(); } };
+  const fmt = n => n >= 1024 * 1024 ? (n / 1024 / 1024) + "M" : (n / 1024) + "K";
+  function draw() {
+    const seq = Math.round(2 ** +S.value), batch = 2 ** +B.value;
+    const kv = kvBytes({ layers: 80, kvHeads: mode === "mha" ? 64 : 8, headDim: 128, seq, batch, bytes, mode });
+    const gb = kv / 1e9, max = Math.max(160, gb * 1.1), X = v => 30 + Math.min(v, max) / max * 640;
+    document.getElementById("sv").textContent = fmt(seq) + " 토큰";
+    document.getElementById("bv").textContent = batch;
+    [...document.getElementById("mode").children].forEach(b => b.classList.toggle("on", b.dataset.m === mode));
+    [...document.getElementById("prec").children].forEach(b => b.classList.toggle("on", +b.dataset.b === bytes));
+    svg.innerHTML = `<rect x="30" y="50" width="640" height="40" fill="var(--line)" opacity=".4" rx="6"/>` +
+      `<rect x="30" y="50" width="${X(gb) - 30}" height="40" fill="${gb > 80 ? "var(--bad)" : "var(--accent)"}" rx="6"/>` +
+      `<line x1="${X(80)}" y1="35" x2="${X(80)}" y2="105" stroke="var(--fg)" stroke-dasharray="4 4"/>` +
+      `<text x="${X(80)}" y="28" text-anchor="middle" font-size="12" fill="var(--fg)">80GB</text>` +
+      `<text x="30" y="125" font-size="13" fill="var(--fg)">KV cache ${gb < 1 ? (gb * 1000).toFixed(0) + "MB" : gb.toFixed(1) + "GB"}</text>`;
+    document.getElementById("cap").innerHTML = gb > 80
+      ? `GPU 한 장(80GB)을 KV cache만으로 넘김 — 가중치(70B·BF16 ≈ 140GB)는 따로 필요. GQA·MLA·FP8·짧은 문맥·작은 배치가 지렛대`
+      : `GQA는 MHA의 1/8, MLA는 latent만 저장해 더 작음. FP8로 바꾸면 절반. 문맥·배치에는 정비례`;
+  }
+  [S, B].forEach(el => el.addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>

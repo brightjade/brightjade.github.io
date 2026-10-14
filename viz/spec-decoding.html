@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Speculative decoding</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 220" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">수락 확률 α <b id="av"></b></span><input type="range" id="a" min="0.3" max="0.95" step="0.05" value="0.75"></label>
+  <label class="row"><span style="white-space:nowrap">draft 비용 c (target 대비) <b id="cv"></b></span><input type="range" id="c" min="0.01" max="0.4" step="0.01" value="0.05"></label>
+  <div style="color:var(--muted);font-size:12px">draft가 k개 토큰을 추측 → target이 한 번에 검증. 토큰마다 확률 α로 수락(min(1, p/q) 규칙이라 출력 분포는 target과 같음). 기대 토큰 수 = (1 − α^(k+1)) / (1 − α).</div>
+</div>
+<script id="logic">
+  function expectedTokens(a, k) { return a === 1 ? k + 1 : (1 - a ** (k + 1)) / (1 - a); }
+  // target forward 1번 + draft forward k번(각각 c) 동안 얻는 토큰 수
+  function speedup(a, k, c) { return expectedTokens(a, k) / (1 + k * c); }
+</script>
+<script>
+  const svg = document.getElementById("plot"), A = document.getElementById("a"), C = document.getElementById("c");
+  function draw() {
+    const a = +A.value, c = +C.value, ks = Array.from({length: 12}, (_, i) => i + 1);
+    const sp = ks.map(k => speedup(a, k, c)), best = ks[sp.indexOf(Math.max(...sp))], top = Math.max(4, ...sp);
+    document.getElementById("av").textContent = a.toFixed(2);
+    document.getElementById("cv").textContent = c.toFixed(2);
+    const X = k => 60 + (k - 1) / 11 * 600, Y = v => 190 - v / top * 165;
+    svg.innerHTML = `<line x1="60" y1="190" x2="660" y2="190" stroke="var(--line)"/><line x1="60" y1="${Y(1)}" x2="660" y2="${Y(1)}" stroke="var(--muted)" stroke-dasharray="4 4"/>` +
+      `<text x="664" y="${Y(1) + 4}" font-size="11" fill="var(--muted)">1×</text>` +
+      ks.map((k, i) => `<rect x="${X(k) - 16}" y="${Y(sp[i])}" width="32" height="${190 - Y(sp[i])}" fill="${k === best ? "var(--good)" : "var(--accent)"}" opacity=".85"/>` +
+        `<text x="${X(k)}" y="${Y(sp[i]) - 5}" text-anchor="middle" font-size="10" fill="var(--muted)">${sp[i].toFixed(1)}</text>` +
+        `<text x="${X(k)}" y="206" text-anchor="middle" font-size="11" fill="var(--muted)">${k}</text>`).join("") +
+      `<text x="660" y="218" text-anchor="end" font-size="11" fill="var(--muted)">추측 길이 k</text>`;
+    document.getElementById("cap").innerHTML = `최적 k = <b>${best}</b>, 약 <b>${Math.max(...sp).toFixed(1)}배</b> 빠름 — α가 높을수록(draft가 target을 닮을수록) 길게 추측해도 이득, draft가 비싸거나 α가 낮으면 짧게`;
+  }
+  [A, C].forEach(el => el.addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>
