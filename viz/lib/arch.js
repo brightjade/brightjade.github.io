@@ -62,6 +62,31 @@ function ends(a, b) {
   return by > ay ? [ax, a.y + a.h, bx, b.y] : [ax, a.y, bx, b.y + b.h];
 }
 
+// 실패 경로는 사이 칸을 가로지르지 않게 휘어서 그림: 같은 줄이면 줄 위로, 같은 칸이면 칸 오른쪽(칸 사이 틈)으로.
+function failPath(a, b) {
+  const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
+  if (Math.abs(by - ay) < a.h / 2) return { x1: ax, y1: a.y, cx: (ax + bx) / 2, cy: a.y - 36, x2: bx, y2: b.y };
+  if (Math.abs(bx - ax) < a.w / 2) return { x1: a.x + a.w, y1: ay, cx: a.x + a.w + 14, cy: (ay + by) / 2, x2: b.x + b.w, y2: by };
+  const [x1, y1, x2, y2] = ends(a, b);
+  return { x1, y1, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, x2, y2 };
+}
+
+// 선분이 다른 칸(양 끝 칸 제외)을 지나가는지. 가장자리를 스치는 건 무시함.
+function blocked(seg, boxes) {
+  const [x1, y1, x2, y2] = seg;
+  return boxes.some(b => {
+    for (let t = 0.05; t < 1; t += 0.05) {
+      const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      if (x > b.x + 4 && x < b.x + b.w - 4 && y > b.y + 4 && y < b.y + b.h - 4) return true;
+    }
+    return false;
+  });
+}
+
+function laneLabel(lane, vertical) {
+  return vertical ? lane.label.split(" — ")[0] : lane.label;
+}
+
 function archSvg(spec, i, width) {
   const { pad, gap, laneGap, h, label } = ARCH_GEOM;
   const { box, vertical, height } = place(spec, width);
@@ -75,10 +100,16 @@ function archSvg(spec, i, width) {
   spec.lanes.forEach((l, li) => {
     const x = vertical ? pad + li * laneW : pad;
     const y = vertical ? pad + 12 : pad + li * (label + h + laneGap) + 12;
-    s += `<text x="${x}" y="${y}" fill="var(--muted)" font-size="12">${l.label}</text>`;
+    s += `<text x="${x}" y="${y}" fill="var(--muted)" font-size="12">${laneLabel(l, vertical)}</text>`;
   });
   spec.edges.forEach((e, k) => {
     if (!vis.edges.has(k)) return;
+    const others = [...vis.nodes].filter(id => id !== e.from && id !== e.to).map(id => box[id]);
+    if (e.fail && blocked(ends(box[e.from], box[e.to]), others)) {
+      const p = failPath(box[e.from], box[e.to]);
+      s += `<path d="M${p.x1},${p.y1} Q${p.cx},${p.cy} ${p.x2},${p.y2}" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah-bad)"/>`;
+      return;
+    }
     const [x1, y1, x2, y2] = ends(box[e.from], box[e.to]);
     const c = e.fail ? "bad" : "muted";
     s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--${c})" stroke-width="1.5"${e.fail ? ' stroke-dasharray="5 4"' : ""} marker-end="url(#ah-${c})"/>`;

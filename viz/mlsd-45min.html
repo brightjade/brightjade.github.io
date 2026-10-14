@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>45-minute ML design interview</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+  "lanes": [{"id": "ask", "label": "앞 20분 — 묻고 정하기"}, {"id": "build", "label": "뒤 25분 — 설계하고 검증하기"}],
+  "nodes": [
+    {"id": "req", "label": "① 요구사항 5분", "kind": "person", "lane": "ask", "col": 0},
+    {"id": "frame", "label": "② ML 문제로 3분", "kind": "data", "lane": "ask", "col": 1},
+    {"id": "metric", "label": "③ 지표 5분", "kind": "data", "lane": "ask", "col": 2},
+    {"id": "data", "label": "④ 데이터 7분", "kind": "store", "lane": "ask", "col": 3},
+    {"id": "model", "label": "⑤ 모델 · 단계 10분", "kind": "model", "lane": "build", "col": 0},
+    {"id": "serve", "label": "⑥ 서빙 7분", "kind": "service", "lane": "build", "col": 1},
+    {"id": "eval", "label": "⑦ 평가 · 모니터링 6분", "kind": "service", "lane": "build", "col": 2},
+    {"id": "wrap", "label": "마무리 2분", "kind": "person", "lane": "build", "col": 3}
+  ],
+  "edges": [
+    {"from": "req", "to": "frame"}, {"from": "frame", "to": "metric"}, {"from": "metric", "to": "data"},
+    {"from": "model", "to": "serve"}, {"from": "serve", "to": "eval"}, {"from": "eval", "to": "wrap"},
+    {"from": "req", "to": "model", "fail": true, "at": 8}
+  ],
+  "steps": [
+    {"cap": "<b>① 요구사항</b>: 누가 쓰나, 규모(QPS·데이터 양), 지연·비용 한도, 틀리면 무엇이 위험한가를 먼저 물음", "show": ["req"]},
+    {"cap": "<b>② ML 문제로 바꾸기</b>: 입력·출력·라벨을 한 문장으로 — 분류인가, 랭킹인가, 생성인가", "show": ["frame"]},
+    {"cap": "<b>③ 지표</b>: offline(정확도류) · online(A/B로 볼 비즈니스 지표) · counter(나빠지면 안 되는 것)를 나눔", "show": ["metric"]},
+    {"cap": "<b>④ 데이터·피처</b>: 어디서 오나, 라벨은 어떻게 얻나, 누수·편향은 없나", "show": ["data"]},
+    {"cap": "<b>⑤ 모델·단계</b>: 단순한 baseline부터. 큰 시스템은 후보 생성 → 랭킹처럼 단계를 나눠 비용을 맞춤", "show": ["model"]},
+    {"cap": "<b>⑥ 서빙</b>: 지연 예산을 단계별로 나누고 캐시·배치·작은 모델로 비용을 줄임", "show": ["serve"]},
+    {"cap": "<b>⑦ 평가·배포·모니터링</b>: 섀도 → A/B → 점진 배포, drift와 피드백 루프 감시", "show": ["eval"]},
+    {"cap": "<b>마무리</b>: 가장 큰 위험 두 개와 시간이 더 있으면 할 일을 말함", "show": ["wrap"]},
+    {"cap": "<b>가장 흔한 감점</b>: ①을 건너뛰고 바로 ⑤ 모델 얘기부터 함 — 요구사항을 묻는 것 자체가 채점 항목", "show": []}
+  ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>

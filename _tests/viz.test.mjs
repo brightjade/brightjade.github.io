@@ -264,3 +264,26 @@ test("every mlsd figure has valid arch data", () => {
     assert.deepEqual([...checkArch(JSON.parse(m[1]))], [], f);
   }
 });
+
+test("arch failure paths bend around the boxes in between", () => {
+  const { failPath } = load("../viz/lib/arch.js", "failPath");
+  const a = { x: 0, y: 100, w: 100, h: 40 }, c = { x: 300, y: 100, w: 100, h: 40 };   // 같은 줄, 사이에 다른 칸
+  const row = failPath(a, c);
+  assert.equal(row.cy < a.y, true);                      // 줄 위쪽으로 돌아감
+  const top = { x: 0, y: 0, w: 100, h: 40 }, low = { x: 0, y: 200, w: 100, h: 40 };   // 같은 칸, 위아래
+  const col = failPath(top, low);
+  assert.equal(col.cx > top.x + top.w, true);            // 칸 오른쪽으로 돌아감
+});
+
+test("arch lane labels shrink on phones", () => {
+  const { laneLabel } = load("../viz/lib/arch.js", "laneLabel");
+  assert.equal(laneLabel({ label: "온라인 — 질문에 답하기" }, false), "온라인 — 질문에 답하기");
+  assert.equal(laneLabel({ label: "온라인 — 질문에 답하기" }, true), "온라인");
+});
+
+test("arch failure paths go straight when nothing is in the way", () => {
+  const { blocked } = load("../viz/lib/arch.js", "blocked");
+  const mid = { x: 150, y: 0, w: 100, h: 40 };
+  assert.equal(blocked([100, 20, 300, 20], [mid]), true);
+  assert.equal(blocked([100, 20, 300, 20], [{ x: 150, y: 100, w: 100, h: 40 }]), false);
+});

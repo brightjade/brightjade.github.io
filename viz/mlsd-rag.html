@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>RAG QA system</title>
+<link rel="stylesheet" href="lib/viz.css">
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="stage" id="stage"></div>
+  <div class="controls"><button id="prev">◀</button><div class="dots" id="dots"></div><button id="next">▶</button></div>
+</div>
+<script id="arch" type="application/json">
+{
+  "lanes": [{"id": "off", "label": "오프라인 — 색인"}, {"id": "on", "label": "온라인 — 질문에 답하기"}, {"id": "fb", "label": "피드백 · 평가"}],
+  "nodes": [
+    {"id": "docs", "label": "문서 원본", "kind": "store", "lane": "off", "col": 0},
+    {"id": "chunk", "label": "파싱 · 청킹", "kind": "service", "lane": "off", "col": 1},
+    {"id": "embed", "label": "임베딩 모델", "kind": "model", "lane": "off", "col": 2},
+    {"id": "index", "label": "벡터 · BM25 색인", "kind": "store", "lane": "off", "col": 3},
+    {"id": "user", "label": "사용자 질문", "kind": "person", "lane": "on", "col": 0},
+    {"id": "rewrite", "label": "질의 재작성", "kind": "model", "lane": "on", "col": 1},
+    {"id": "retrieve", "label": "하이브리드 검색", "kind": "service", "lane": "on", "col": 2},
+    {"id": "rerank", "label": "재정렬", "kind": "model", "lane": "on", "col": 3},
+    {"id": "gen", "label": "LLM 답 + 인용", "kind": "model", "lane": "on", "col": 4},
+    {"id": "logs", "label": "로그 · 👍👎", "kind": "store", "lane": "fb", "col": 3},
+    {"id": "evalset", "label": "평가셋 · judge", "kind": "service", "lane": "fb", "col": 4}
+  ],
+  "edges": [
+    {"from": "docs", "to": "chunk"}, {"from": "chunk", "to": "embed"}, {"from": "embed", "to": "index"},
+    {"from": "user", "to": "rewrite"}, {"from": "rewrite", "to": "retrieve"}, {"from": "index", "to": "retrieve"},
+    {"from": "retrieve", "to": "rerank"}, {"from": "rerank", "to": "gen"},
+    {"from": "gen", "to": "logs"}, {"from": "logs", "to": "evalset"},
+    {"from": "retrieve", "to": "gen", "fail": true, "at": 6}
+  ],
+  "steps": [
+    {"cap": "먼저 <b>색인</b>: 문서를 파싱해 의미 단위로 자르고(청킹) 임베딩해 둠 — 질문이 오기 전에 미리 하는 일", "show": ["docs", "chunk", "embed", "index"]},
+    {"cap": "질문이 오면 대화 맥락을 반영해 <b>질의를 다시 씀</b> (\"그거\" → 무엇인지 풀어 씀)", "show": ["user", "rewrite"]},
+    {"cap": "<b>하이브리드 검색</b>: 벡터(의미) + BM25(키워드)로 후보 수십 개. 권한 없는 문서는 여기서 걸러야 함", "show": ["retrieve"]},
+    {"cap": "<b>재정렬</b>: cross-encoder로 상위 몇 개만 남김 — 정확도는 올리고 LLM에 넣는 토큰은 줄임 (A9)", "show": ["rerank"]},
+    {"cap": "LLM이 <b>근거 문서를 인용하며</b> 답함. 근거에 없는 말은 하지 않게 프롬프트·출력 형식으로 묶음", "show": ["gen"]},
+    {"cap": "<b>로그 · 피드백 → 평가셋</b>: 검색 recall과 답의 근거 충실도를 따로 재야 어디가 문제인지 앎", "show": ["logs", "evalset"]},
+    {"cap": "<b>실패 경로</b>: 검색이 놓치면 LLM은 그럴듯하게 지어냄 → 근거가 약하면 \"모름\"이라고 답하게 함 (A7)", "show": []}
+  ]
+}
+</script>
+<script src="lib/stepper.js"></script>
+<script src="lib/arch.js"></script>
+<script>mountArch();</script>
+</body>
+</html>
