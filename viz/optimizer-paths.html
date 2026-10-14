@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Optimizer paths</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}.hide{display:none!important}</style>
+</head>
+<body><div id="app">
+  <div class="seg" id="mode"><button data-m="path" class="on">좁은 골짜기에서의 경로</button><button data-m="muon">Muon: 업데이트 직교화</button></div>
+  <div class="caption" id="cap"></div>
+  <div id="legend" style="display:flex;gap:2px 14px;flex-wrap:wrap;font-weight:600;font-size:14px"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet"></svg>
+  <div id="pathCtl">
+    <label class="row"><span style="white-space:nowrap">스텝 <b id="tv"></b></span><input type="range" id="t" min="0" max="100" step="1" value="60"></label>
+    <label class="row"><span style="white-space:nowrap">학습률 배율 <b id="lv"></b></span><input type="range" id="lr" min="0.25" max="1.5" step="0.05" value="1"></label>
+  </div>
+  <div id="muonCtl" class="hide">
+    <label class="row"><span style="white-space:nowrap">Newton–Schulz 반복 <b id="kv"></b></span><input type="range" id="k" min="0" max="5" step="1" value="0"></label>
+  </div>
+  <div style="color:var(--muted);font-size:12px" id="note"></div>
+</div>
+<script id="logic">
+  // loss = ½(A·x² + B·y²): x 방향은 완만하고 y 방향은 80배 가파른 골짜기
+  const A = 0.05, B = 4, START = [-9, 2];
+  const BASE = { sgd: 0.45, momentum: 0.08, adam: 0.3 };
+  function loss(x, y) { return 0.5 * (A * x * x + B * y * y); }
+  function run(name, mul, steps) {
+    let [x, y] = START, vx = 0, vy = 0, mx = 0, my = 0, sx = 0, sy = 0;
+    const lr = BASE[name] * mul, pts = [[x, y]];
+    for (let t = 1; t <= steps; t++) {
+      const gx = A * x, gy = B * y;
+      if (name === "sgd") { x -= lr * gx; y -= lr * gy; }
+      else if (name === "momentum") { vx = 0.9 * vx + gx; vy = 0.9 * vy + gy; x -= lr * vx; y -= lr * vy; }
+      else {
+        mx = 0.9 * mx + 0.1 * gx; my = 0.9 * my + 0.1 * gy;
+        sx = 0.999 * sx + 0.001 * gx * gx; sy = 0.999 * sy + 0.001 * gy * gy;
+        const c1 = 1 - 0.9 ** t, c2 = 1 - 0.999 ** t;
+        x -= lr * (mx / c1) / (Math.sqrt(sx / c2) + 1e-8);
+        y -= lr * (my / c1) / (Math.sqrt(sy / c2) + 1e-8);
+      }
+      if (!isFinite(x + y) || Math.abs(x) > 1e6 || Math.abs(y) > 1e6) break;
+      pts.push([x, y]);
+    }
+    return pts;
+  }
+  // Muon의 Newton–Schulz 5차 다항식: 행렬에 걸면 특이값마다 이 함수가 걸림
+  const NS = [3.4445, -4.7750, 2.0315];
+  function nsPoly(s) { return NS[0] * s + NS[1] * s ** 3 + NS[2] * s ** 5; }
+  function muonSigmas(sig, k) {
+    const f = Math.hypot(...sig);
+    let s = sig.map(v => v / f);
+    for (let i = 0; i < k; i++) s = s.map(nsPoly);
+    return s;
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  const OPT = [["sgd", "SGD", "var(--warn)"], ["momentum", "Momentum", "var(--good)"], ["adam", "Adam", "var(--accent)"]];
+  const SIG = [8, 2, 0.5, 0.1];
+  let mode = "path";
+  const X = x => 40 + (x + 10) / 13 * 640, Y = y => 125 - y * 38;
+  function drawPath() {
+    const t = +I("t").value, mul = +I("lr").value;
+    I("tv").textContent = t; I("lv").textContent = "×" + mul.toFixed(2);
+    let s = `<defs><clipPath id="c"><rect x="0" y="0" width="700" height="250"/></clipPath></defs>`;
+    for (const lv of [0.05, 0.3, 1, 2.5, 5, 9]) {
+      const rx = Math.sqrt(2 * lv / A), ry = Math.sqrt(2 * lv / B);
+      s += `<ellipse cx="${X(0)}" cy="${Y(0)}" rx="${rx / 13 * 640}" ry="${ry * 38}" fill="none" stroke="var(--line)"/>`;
+    }
+    s += `<circle cx="${X(0)}" cy="${Y(0)}" r="4" fill="var(--fg)"/><text x="${X(0) + 8}" y="${Y(0) - 8}" font-size="12" fill="var(--muted)">최솟값</text>`;
+    const res = OPT.map(([k, label, c]) => {
+      const p = run(k, mul, t), blown = p.length < t + 1, end = p.at(-1);
+      s += `<polyline clip-path="url(#c)" points="${p.map(([x, y]) => `${X(Math.max(-60, Math.min(60, x))).toFixed(1)},${Y(Math.max(-60, Math.min(60, y))).toFixed(1)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
+      if (!blown && Math.abs(end[1]) < 3.2) s += `<circle cx="${X(end[0])}" cy="${Y(end[1])}" r="4.5" fill="${c}"/>`;
+      return { label, c, blown: blown || Math.abs(end[1]) > 3.2, L: loss(...end) };
+    });
+    I("legend").innerHTML = res.map(r => `<span style="color:${r.c}">${r.label}: ${r.blown ? "발산" : "loss " + r.L.toFixed(3)}</span>`).join("");
+    s += `<circle cx="${X(START[0])}" cy="${Y(START[1])}" r="4" fill="none" stroke="var(--fg)"/><text x="${X(START[0]) - 9}" y="${Y(START[1]) + 4}" font-size="13" fill="var(--muted)" text-anchor="end">시작</text>`;
+    svg.innerHTML = s;
+    const sgd = res[0];
+    I("cap").innerHTML = sgd.blown
+      ? `학습률을 올리자 SGD가 <b style="color:var(--bad)">발산</b> — 가파른 y 방향이 lr의 상한을 정해서, 완만한 x 방향은 그 lr로 느리게 갈 수밖에 없음`
+      : `SGD는 가파른 y 방향으로 <b style="color:var(--warn)">지그재그</b>하며 완만한 x 방향은 느림 · Momentum은 같은 방향 gradient를 쌓아 가속 · Adam은 좌표마다 gradient 크기로 나눠 두 방향을 비슷한 보폭으로 감`;
+    I("note").textContent = "loss = ½(0.05x² + 4y²), 가파른 방향이 80배. 배율 ×1의 lr: SGD 0.45, Momentum 0.08(β=0.9), Adam 0.3(β₁=0.9, β₂=0.999). SGD는 배율 ×1.11부터 발산.";
+  }
+  function drawMuon() {
+    const k = +I("k").value, base = muonSigmas(SIG, 0), now = muonSigmas(SIG, k);
+    I("kv").textContent = k + "회";
+    const H = v => v * 165, y0 = 220;
+    let s = `<line x1="60" y1="${y0}" x2="680" y2="${y0}" stroke="var(--line)"/>`;
+    s += `<line x1="60" y1="${y0 - H(1)}" x2="680" y2="${y0 - H(1)}" stroke="var(--fg)" stroke-dasharray="4 4" opacity=".5"/><text x="676" y="${y0 - H(1) - 6}" text-anchor="end" font-size="12" fill="var(--muted)">특이값 1 (완전 직교)</text>`;
+    now.forEach((v, i) => {
+      const x = 110 + i * 150;
+      s += `<rect x="${x}" y="${y0 - H(base[i])}" width="40" height="${H(base[i])}" fill="var(--line)"/>`;
+      s += `<rect x="${x + 46}" y="${y0 - H(v)}" width="40" height="${H(v)}" fill="var(--accent)"/>`;
+      s += `<text x="${x + 43}" y="${y0 + 18}" text-anchor="middle" font-size="15" fill="var(--muted)">방향 ${i + 1}</text>`;
+      s += `<text x="${x + 66}" y="${y0 - H(v) - 6}" text-anchor="middle" font-size="16" fill="var(--accent)">${v.toFixed(2)}</text>`;
+    });
+    I("legend").innerHTML = `<span style="color:var(--muted)">■ 원래 gradient(크기로 나눔)</span><span style="color:var(--accent)">■ Newton–Schulz ${k}회 뒤</span>`;
+    svg.innerHTML = s;
+    const share = base[0] ** 2 / base.reduce((a, b) => a + b * b, 0);
+    I("cap").innerHTML = k === 0
+      ? `가중치 행렬의 gradient는 보통 몇 방향에 쏠려 있음 — 여기선 방향 1이 에너지의 ${(share * 100).toFixed(0)}%. 그대로 쓰면 드문 방향(3·4)은 거의 안 배움`
+      : `반복할수록 모든 특이값이 <b style="color:var(--accent)">1 근처</b>로 모임 = 업데이트 UVᵀ에 가까워짐 → 모든 방향을 고르게 갱신. 빠르게 하려고 정확히 1이 아니라 0.7~1.2 근처로만 맞춤`;
+    I("note").textContent = "Muon: 2D 가중치 행렬의 momentum 업데이트를 Frobenius 크기로 나눈 뒤 5차 다항식(3.4445, −4.7750, 2.0315)을 5번 적용. 다항식은 특이값마다 따로 걸리므로 SVD 없이 행렬곱만으로 직교화됨.";
+  }
+  function draw() { mode === "path" ? drawPath() : drawMuon(); }
+  I("mode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.m;
+    [...I("mode").children].forEach(x => x.classList.toggle("on", x === b));
+    I("pathCtl").classList.toggle("hide", mode !== "path"); I("muonCtl").classList.toggle("hide", mode !== "muon");
+    draw();
+  });
+  ["t", "lr", "k"].forEach(id => I(id).addEventListener("input", draw));
+  if (location.hash === "#muon") I("mode").children[1].click(); else draw();
+</script>
+</body>
+</html>

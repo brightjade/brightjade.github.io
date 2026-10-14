@@ -163,3 +163,42 @@ test("training budget", () => {
   assert.ok(b.gpuDays > 1.7e5 && b.gpuDays < 2.0e5);
   assert.ok(Math.abs(b.memBytes - 1.12e12) < 1e9);               // 16 bytes/param
 });
+
+test("optimizer paths on a ravine", () => {
+  const { run, loss, nsPoly, muonSigmas } = logic("optimizer-paths.html", "run, loss, nsPoly, muonSigmas");
+  const last = (name, mul, n) => { const p = run(name, mul, n).at(-1); return loss(p[0], p[1]); };
+  assert.ok(last("momentum", 1, 60) < last("sgd", 1, 60));         // 관성이 완만한 방향을 빨리 감
+  assert.ok(last("adam", 1, 60) < last("sgd", 1, 60));             // 좌표별 정규화
+  assert.ok(last("sgd", 1.3, 60) > loss(...run("sgd", 1.3, 0)[0]));  // 가파른 방향 때문에 lr을 못 올림
+  const sig = [8, 2, 0.5, 0.1], out = muonSigmas(sig, 5);
+  assert.ok(Math.max(...out) < 1.25 && Math.min(...out) > 0.6);   // 특이값이 1 근처로 모임
+  assert.ok(Math.abs(nsPoly(0) - 0) < 1e-12);
+});
+
+test("signal propagation through depth", () => {
+  const { simulate } = logic("signal-prop.html", "simulate");
+  const r = (o) => simulate({ depth: 30, init: "he", act: "relu", residual: false, ...o });
+  const he = r({}), xav = r({ init: "xavier" });
+  const ratio = s => s.at(-1) / s[0];
+  assert.ok(ratio(he.std) > 0.3 && ratio(he.std) < 3);            // He + ReLU는 유지
+  assert.ok(ratio(xav.std) < 0.01);                                // Xavier + ReLU는 절반씩 줄어 사라짐
+  const sig = r({ init: "xavier", act: "sigmoid" });
+  assert.ok(sig.grad[0] < 1e-6 * sig.grad.at(-1));                 // sigmoid 미분 ≤ 0.25가 층마다 곱해져 소실
+  const big = r({ init: "large", act: "tanh" });
+  assert.ok(big.grad[0] > 10 * big.grad.at(-1));                   // tanh에 큰 초기화: 앞쪽으로 갈수록 폭발
+  const res = r({ init: "small", residual: true });
+  assert.ok(res.grad[0] > 0.5 * res.grad.at(-1));                  // identity 경로로 gradient 유지
+  const plain = r({ init: "small" });
+  assert.ok(plain.grad[0] < 1e-3 * plain.grad.at(-1));
+});
+
+test("learning rate schedules", () => {
+  const { lr } = logic("lr-schedule.html", "lr");
+  const o = { total: 1000, warmup: 0.05, minRatio: 0.1, peak: 1 };
+  assert.ok(Math.abs(lr(0, { ...o, kind: "cosine" })) < 0.05);
+  assert.ok(Math.abs(lr(50, { ...o, kind: "cosine" }) - 1) < 1e-9);
+  assert.ok(Math.abs(lr(1000, { ...o, kind: "cosine" }) - 0.1) < 1e-9);
+  assert.ok(lr(500, { ...o, kind: "cosine" }) < 0.7 && lr(500, { ...o, kind: "cosine" }) > 0.5);
+  assert.ok(Math.abs(lr(700, { ...o, kind: "wsd", decay: 0.2 }) - 1) < 1e-9);   // stable 구간은 평평
+  assert.ok(Math.abs(lr(1000, { ...o, kind: "wsd", decay: 0.2 }) - 0.1) < 1e-9);
+});

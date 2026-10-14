@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>LR schedule</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="seg" id="kind"><button data-v="cosine" class="on">warmup + cosine</button><button data-v="wsd">WSD (warmup-stable-decay)</button><button data-v="constant">warmup만</button></div>
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 230" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span class="lab">warmup <b id="wv"></b></span><input type="range" id="w" min="0" max="0.1" step="0.005" value="0.03"></label>
+  <label class="row"><span class="lab">최저 lr <b id="mv"></b></span><input type="range" id="m" min="0" max="0.3" step="0.01" value="0.1"></label>
+  <div style="color:var(--muted);font-size:12px">가로: 전체 학습 스텝, 세로: 최대 lr 대비. WSD는 마지막 20%에서 선형으로 내림.</div>
+</div>
+<script id="logic">
+  function lr(step, { total, warmup, minRatio, peak = 1, kind, decay = 0.2 }) {
+    const W = warmup * total, lo = minRatio * peak;
+    if (step < W) return peak * step / W;
+    if (kind === "constant") return peak;
+    if (kind === "wsd") {
+      const start = total * (1 - decay);
+      return step < start ? peak : peak - (peak - lo) * (step - start) / (total - start);
+    }
+    const p = (step - W) / Math.max(1, total - W);
+    return lo + (peak - lo) * 0.5 * (1 + Math.cos(Math.PI * p));
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  let kind = "cosine";
+  const T = 1000, X = s => 50 + s / T * 630, Y = v => 200 - v * 170;
+  const curve = o => Array.from({ length: 401 }, (_, i) => { const s = i / 400 * T; return `${X(s).toFixed(1)},${Y(lr(s, o)).toFixed(1)}`; }).join(" ");
+  function draw() {
+    const w = +I("w").value, m = +I("m").value, base = { total: T, warmup: w, minRatio: m };
+    I("wv").textContent = (w * 100).toFixed(1) + "%"; I("mv").textContent = (m * 100).toFixed(0) + "%";
+    let s = `<line x1="50" y1="200" x2="680" y2="200" stroke="var(--line)"/><line x1="50" y1="25" x2="50" y2="200" stroke="var(--line)"/>
+      <text x="44" y="${Y(1) + 4}" font-size="12" text-anchor="end" fill="var(--muted)">최대</text><text x="44" y="204" font-size="12" text-anchor="end" fill="var(--muted)">0</text>
+      <text x="680" y="222" font-size="12" text-anchor="end" fill="var(--muted)">학습 스텝 →</text>`;
+    if (w > 0) s += `<rect x="50" y="25" width="${X(w * T) - 50}" height="175" fill="var(--warn)" opacity=".12"/><text x="${X(w * T) + 4}" y="40" font-size="12" fill="var(--warn)">warmup</text>`;
+    if (kind === "wsd") s += `<rect x="${X(0.8 * T)}" y="25" width="${X(T) - X(0.8 * T)}" height="175" fill="var(--good)" opacity=".12"/><text x="${X(0.8 * T) + 4}" y="40" font-size="12" fill="var(--good)">decay</text>`;
+    for (const k of ["cosine", "wsd", "constant"]) if (k !== kind) s += `<polyline points="${curve({ ...base, kind: k })}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>`;
+    s += `<polyline points="${curve({ ...base, kind })}" fill="none" stroke="var(--accent)" stroke-width="3"/>`;
+    svg.innerHTML = s;
+    I("cap").innerHTML = {
+      cosine: `<b>warmup</b>: 처음엔 가중치가 무작위라 gradient가 크고 들쭉날쭉하며, Adam의 2차 모멘트도 몇 스텝치 평균뿐이라 불안정 → 작은 lr로 시작. <b>cosine</b>: 끝으로 갈수록 lr을 낮춰 noise로 튀던 파라미터가 골짜기 바닥으로 내려가게 함`,
+      wsd: `<b>WSD</b>: 최대 lr을 유지하다 마지막 10~20%에서만 내림. 끝나는 시점을 미리 정하지 않아도 돼서, 중간 체크포인트에서 짧게 decay만 해 비교하거나 학습을 이어 가기 쉬움. decay 구간에서 loss가 크게 떨어짐`,
+      constant: `decay가 없으면 lr이 큰 채로 끝나 파라미터가 바닥 근처에서 계속 튐 → 같은 스텝에서 loss가 cosine·WSD보다 높게 끝남. warmup이 0%면 첫 스텝부터 최대 lr이라 초기 loss spike·발산 위험`,
+    }[kind];
+  }
+  I("kind").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    kind = b.dataset.v; [...I("kind").children].forEach(x => x.classList.toggle("on", x === b)); draw();
+  });
+  ["w", "m"].forEach(id => I(id).addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Signal propagation</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:10px;align-items:center}.lab{white-space:nowrap;color:var(--muted);min-width:4.5em}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button{padding:2px 10px}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="row"><span class="lab">활성화</span><div class="seg" id="act"><button data-v="sigmoid">sigmoid</button><button data-v="tanh">tanh</button><button data-v="relu" class="on">ReLU</button></div></div>
+  <div class="row"><span class="lab">초기화</span><div class="seg" id="init"><button data-v="small">작게</button><button data-v="xavier" class="on">Xavier</button><button data-v="he">He</button><button data-v="large">크게</button></div></div>
+  <div class="row"><span class="lab">구조</span><div class="seg" id="res"><button data-v="0" class="on">plain</button><button data-v="1">residual</button></div></div>
+  <label class="row"><span class="lab">깊이 <b id="dv"></b></span><input type="range" id="depth" min="5" max="60" step="1" value="30"></label>
+  <div style="color:var(--muted);font-size:12px">폭 64 MLP. 가중치 분산: 작게 0.25/n · Xavier 1/n · He 2/n · 크게 6.25/n. residual은 h + f(h), 가지 출력을 1/√깊이로 줄임.</div>
+</div>
+<script id="logic">
+  // 폭 64인 MLP에 무작위 입력을 넣어 층별 activation 크기와, 출력에서 넣은 무작위 gradient가 층별로 얼마나 남는지 잰다.
+  function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const ACT = {
+    sigmoid: [z => 1 / (1 + Math.exp(-z)), z => { const s = 1 / (1 + Math.exp(-z)); return s * (1 - s); }],
+    tanh: [Math.tanh, z => 1 - Math.tanh(z) ** 2],
+    relu: [z => z > 0 ? z : 0, z => z > 0 ? 1 : 0],
+  };
+  const GAIN = { small: 0.5, xavier: 1, he: Math.SQRT2, large: 2.5 };   // 가중치 표준편차 = GAIN/√n
+  function simulate({ depth, init, act, residual, width = 64, batch = 32, seed = 7 }) {
+    const r = rng(seed), gauss = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    const [f, df] = ACT[act], sd = GAIN[init] / Math.sqrt(width), beta = residual ? 1 / Math.sqrt(depth) : 0;
+    const W = Array.from({ length: depth }, () => Float64Array.from({ length: width * width }, () => gauss() * sd));
+    const rms = hs => Math.sqrt(hs.reduce((s, v) => s + v.reduce((a, b) => a + b * b, 0), 0) / (hs.length * width));
+    let h = Array.from({ length: batch }, () => Float64Array.from({ length: width }, gauss));
+    const std = [rms(h)], Z = [];
+    for (let l = 0; l < depth; l++) {
+      const z = h.map(v => { const o = new Float64Array(width); for (let i = 0; i < width; i++) { let s = 0; for (let j = 0; j < width; j++) s += W[l][i * width + j] * v[j]; o[i] = s; } return o; });
+      Z.push(z);
+      h = h.map((v, b) => residual ? v.map((x, i) => x + beta * f(z[b][i])) : z[b].map(f));
+      std.push(rms(h));
+    }
+    let g = Array.from({ length: batch }, () => Float64Array.from({ length: width }, gauss));
+    const grad = new Array(depth + 1); grad[depth] = rms(g);
+    for (let l = depth - 1; l >= 0; l--) {
+      g = g.map((gv, b) => {
+        const gz = gv.map((x, i) => x * df(Z[l][b][i]) * (residual ? beta : 1)), o = new Float64Array(width);
+        for (let j = 0; j < width; j++) { let s = 0; for (let i = 0; i < width; i++) s += W[l][i * width + j] * gz[i]; o[j] = s; }
+        return residual ? o.map((x, j) => x + gv[j]) : o;
+      });
+      grad[l] = rms(g);
+    }
+    return { std, grad };
+  }
+</script>
+<script>
+  const I = id => document.getElementById(id), svg = I("plot");
+  const st = { act: "relu", init: "xavier", res: "0" };
+  const LO = -12, HI = 8;
+  const fmt = v => { if (v >= 1e-2 && v < 1e3) return v.toPrecision(2); const [m, e] = v.toExponential(0).split("e"); return `${m}×10<sup>${+e}</sup>`; };
+  function panel(x0, W, vals, title, color) {
+    const top = 34, bot = 214, n = vals.length - 1;
+    const X = i => x0 + 34 + i / n * (W - 40), Y = v => { const e = Math.max(LO, Math.min(HI, Math.log10(Math.max(v, 1e-300)))); return bot - (e - LO) / (HI - LO) * (bot - top); };
+    let s = `<text x="${x0 + 34}" y="20" font-size="14" font-weight="600" fill="${color}">${title}</text>`;
+    for (const e of [-12, -8, -4, 0, 4, 8]) s += `<line x1="${x0 + 34}" x2="${x0 + W - 6}" y1="${Y(10 ** e)}" y2="${Y(10 ** e)}" stroke="var(--line)" ${e ? 'stroke-dasharray="2 4"' : ""}/><text x="${x0 + 28}" y="${Y(10 ** e) + 4}" font-size="11" text-anchor="end" fill="var(--muted)">${e ? "1e" + e : "1"}</text>`;
+    s += `<polyline points="${vals.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="2.5"/>`;
+    s += `<text x="${x0 + 34}" y="${bot + 18}" font-size="12" fill="var(--muted)">입력층</text><text x="${x0 + W - 6}" y="${bot + 18}" font-size="12" text-anchor="end" fill="var(--muted)">층 ${n}</text>`;
+    return s;
+  }
+  function draw() {
+    const depth = +I("depth").value, residual = st.res === "1";
+    I("dv").textContent = depth;
+    const r = simulate({ depth, init: st.init, act: st.act, residual });
+    const VW = svg.clientWidth && svg.clientWidth < 500 ? 470 : 700, half = VW / 2;
+    svg.setAttribute("viewBox", `0 0 ${VW} 236`);
+    svg.innerHTML = panel(0, half - 6, r.std, "앞으로: activation 크기", "var(--accent)") + panel(half + 6, half - 6, r.grad, "뒤로: gradient 크기", "var(--good)");
+    const g = r.grad[0] / r.grad[depth], a = r.std[depth] / r.std[0];
+    let msg;
+    if (g < 1e-2) {
+      const why = st.act === "sigmoid" ? "sigmoid 미분은 최대 0.25라 층마다 곱해지며 줄어듦"
+        : st.act === "relu" && st.init !== "small" ? "ReLU는 입력의 절반을 0으로 만들어 분산을 반으로 줄임 → He 초기화(2/n)가 이걸 보정"
+        : "가중치가 작아 층마다 신호가 줄어듦";
+      msg = `입력층 gradient가 마지막 층의 <b style="color:var(--bad)">${fmt(g)}배</b> — vanishing gradient: 앞쪽 층은 거의 안 배움. ${why}`;
+    } else if (g > 1e2 || a > 1e2) {
+      msg = `<b style="color:var(--bad)">exploding</b> — 층마다 1보다 큰 배율이 곱해져 ${depth}층에서 ${fmt(Math.max(g, a))}배. ${st.act === "tanh" ? "tanh는 activation이 ±1에 갇혀 앞으로는 멀쩡해 보여도 뒤로는 폭발할 수 있음" : "학습률을 조금만 올려도 NaN"}`;
+    } else {
+      msg = residual
+        ? `<b style="color:var(--good)">유지됨</b> — residual의 identity 경로 덕분에 gradient가 각 층을 건너뛰어 그대로 흘러감 (∂h/∂h_prev = I + …)`
+        : `<b style="color:var(--good)">유지됨</b> — 초기화가 활성화 함수에 맞아 층마다 배율이 1에 가까움 (gradient 비 ${fmt(g)})`;
+    }
+    I("cap").innerHTML = msg;
+  }
+  for (const [id, key] of [["act", "act"], ["init", "init"], ["res", "res"]])
+    I(id).addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      st[key] = b.dataset.v; [...I(id).children].forEach(x => x.classList.toggle("on", x === b)); draw();
+    });
+  I("depth").addEventListener("input", draw);
+  addEventListener("resize", draw);
+  draw();
+</script>
+</body>
+</html>
