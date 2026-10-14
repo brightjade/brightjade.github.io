@@ -103,3 +103,18 @@ test("eval error bars", () => {
   assert.ok(halfWidth(200, 1) * 100 > 2);                     // 200문항에선 2점 차이가 오차 안
   assert.ok(halfWidth(10000, 1) * 100 < 2);
 });
+
+test("sqrt-d keeps softmax from saturating", () => {
+  const { scores, softmax, std } = logic("sqrt-d.html", "scores, softmax, std");
+  const raw = scores(1024, 16, 5, false), scaled = scores(1024, 16, 5, true);
+  assert.ok(std(raw) > 15 && std(raw) < 50);            // ≈ √1024 = 32
+  assert.ok(std(scaled) > 0.5 && std(scaled) < 1.6);     // ≈ 1
+  assert.ok(Math.max(...softmax(raw)) > 0.9);            // 한 토큰에 쏠림
+  assert.ok(Math.max(...softmax(scaled)) < 0.7);
+});
+
+test("rope dot depends only on relative position", () => {
+  const { score } = logic("rope.html", "score");
+  assert.ok(Math.abs(score(3, 1) - score(8, 6)) < 1e-9);
+  assert.ok(Math.abs(score(3, 1) - score(3, 2)) > 1e-3);
+});

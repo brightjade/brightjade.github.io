@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Why divide by sqrt(d)</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="seg" id="mode"><button data-s="0">그대로 q·k</button><button data-s="1">q·k / √d</button></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 220" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">차원 d = <b id="dv"></b></span><input type="range" id="d" min="2" max="12" step="1" value="10"></label>
+  <div style="color:var(--muted);font-size:12px">q와 k 16개의 성분을 평균 0, 분산 1로 뽑았을 때 attention 가중치(softmax). 막대 하나 = key 하나.</div>
+</div>
+<script id="logic">
+  function rng(seed) { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; }
+  function gauss(r) { const u = Math.max(r(), 1e-12), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function scores(d, n, seed, scaled) {
+    const r = rng(seed), q = Array.from({length: d}, () => gauss(r));
+    return Array.from({length: n}, () => {
+      let s = 0; for (let i = 0; i < d; i++) s += q[i] * gauss(r);
+      return scaled ? s / Math.sqrt(d) : s;
+    });
+  }
+  function softmax(xs) { const m = Math.max(...xs), e = xs.map(x => Math.exp(x - m)), z = e.reduce((a, b) => a + b, 0); return e.map(x => x / z); }
+  function std(xs) { const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length); }
+</script>
+<script>
+  let scaled = false;
+  const svg = document.getElementById("plot"), slider = document.getElementById("d"), mode = document.getElementById("mode");
+  mode.onclick = e => { if (e.target.dataset.s !== undefined) { scaled = e.target.dataset.s === "1"; draw(); } };
+  function draw() {
+    const d = 2 ** +slider.value, sc = scores(d, 16, 11, scaled), w = softmax(sc);
+    document.getElementById("dv").textContent = d;
+    [...mode.children].forEach(b => b.classList.toggle("on", (b.dataset.s === "1") === scaled));
+    svg.innerHTML = `<line x1="40" y1="190" x2="680" y2="190" stroke="var(--line)"/>` + w.map((p, i) =>
+      `<rect x="${50 + i * 39}" y="${190 - p * 170}" width="30" height="${p * 170}" fill="var(--accent)" opacity=".85"/>` +
+      `<text x="${65 + i * 39}" y="${185 - p * 170}" text-anchor="middle" font-size="10" fill="var(--muted)">${p > 0.02 ? p.toFixed(2) : ""}</text>`).join("") +
+      `<text x="40" y="210" font-size="11" fill="var(--muted)">score 표준편차 ${std(sc).toFixed(1)} · 가장 큰 가중치 ${Math.max(...w).toFixed(2)}</text>`;
+    const peak = Math.max(...w);
+    document.getElementById("cap").innerHTML = scaled
+      ? `√d로 나누면 d가 커져도 score의 표준편차가 1 근처 → 가중치가 여러 key에 퍼지고 gradient도 살아 있음`
+      : peak > 0.9 ? `d = ${d}이면 score 표준편차가 √d ≈ ${Math.sqrt(d).toFixed(0)} → softmax가 <b style="color:var(--bad)">한 key에 거의 다 쏠림</b> (one-hot에 가까워 gradient가 사라짐)`
+      : `d가 작을 땐 괜찮음. 슬라이더로 d를 키워 볼 것`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>

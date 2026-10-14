@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>RoPE rotation</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>.row{display:flex;gap:12px;align-items:center}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{border-color:var(--accent);color:var(--accent);font-weight:600}</style>
+</head>
+<body><div id="app">
+  <div class="caption" id="cap"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 240" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">query 위치 m = <b id="mv"></b></span><input type="range" id="m" min="0" max="20" step="1" value="6"></label>
+  <label class="row"><span style="white-space:nowrap">key 위치 n = <b id="nv"></b></span><input type="range" id="n" min="0" max="20" step="1" value="2"></label>
+  <div class="row"><button id="shift">둘 다 +5 옮기기</button><span style="color:var(--muted);font-size:12px">차원 쌍마다 회전 속도(θ)가 다름: 빠른 쌍은 가까운 위치, 느린 쌍은 먼 위치를 구분.</span></div>
+</div>
+<script id="logic">
+  const THETAS = [0.9, 0.3, 0.08];               // 차원 쌍 3개의 회전 속도(설명용)
+  const Q = [[1, 0.2], [0.8, 0.5], [0.6, -0.4]], K = [[0.7, 0.6], [0.2, 1], [0.9, 0.1]];
+  const rot = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+  // q를 m·θ, k를 n·θ만큼 돌린 뒤 내적 — 결과는 (m − n)에만 의존
+  function score(m, n) {
+    return THETAS.reduce((s, t, i) => { const q = rot(Q[i], m * t), k = rot(K[i], n * t); return s + q[0] * k[0] + q[1] * k[1]; }, 0);
+  }
+</script>
+<script>
+  const svg = document.getElementById("plot"), mS = document.getElementById("m"), nS = document.getElementById("n");
+  document.getElementById("shift").onclick = () => { mS.value = Math.min(20, +mS.value + 5); nS.value = Math.min(20, +nS.value + 5); draw(); };
+  function clock(cx, i, m, n) {
+    const t = THETAS[i], q = rot(Q[i], m * t), k = rot(K[i], n * t), R = 70, cy = 110;
+    const arrow = ([x, y], color) => `<line x1="${cx}" y1="${cy}" x2="${cx + x * R}" y2="${cy - y * R}" stroke="${color}" stroke-width="3"/><circle cx="${cx + x * R}" cy="${cy - y * R}" r="4" fill="${color}"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--line)"/>` + arrow(q, "var(--accent)") + arrow(k, "var(--warn)") +
+      `<text x="${cx}" y="${cy + R + 22}" text-anchor="middle" font-size="12" fill="var(--muted)">쌍 ${i + 1} · θ=${t}</text>`;
+  }
+  function draw() {
+    const m = +mS.value, n = +nS.value;
+    document.getElementById("mv").textContent = m;
+    document.getElementById("nv").textContent = n;
+    svg.innerHTML = [0, 1, 2].map(i => clock(120 + i * 230, i, m, n)).join("") +
+      `<text x="20" y="20" font-size="12" fill="var(--accent)">━ query (m·θ만큼 회전)</text><text x="220" y="20" font-size="12" fill="var(--warn)">━ key (n·θ만큼 회전)</text>`;
+    document.getElementById("cap").innerHTML = `m − n = <b>${m - n}</b> → attention score <b>${score(m, n).toFixed(3)}</b> — 둘을 같이 옮겨도 사이 각도가 그대로라 score가 안 바뀜 (상대 위치만 남음)`;
+  }
+  [mS, nS].forEach(el => el.addEventListener("input", draw));
+  draw();
+</script>
+</body>
+</html>
