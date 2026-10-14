@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Context budget</title>
+<link rel="stylesheet" href="lib/viz.css">
+<style>
+  .seg { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg button.on { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .row { display:flex; gap:12px; align-items:center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="caption" id="cap"></div>
+  <div class="seg" id="seg"></div>
+  <svg class="stage" id="plot" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet"></svg>
+  <label class="row"><span style="white-space:nowrap">단계 <b id="sv"></b></span><input type="range" id="step" min="0" max="40" step="1" value="20"></label>
+  <div style="color:var(--muted);font-size:12px">숫자는 설명용: 시스템 프롬프트·툴 설명 12K, 단계마다 생각 1K + 툴 결과 6K, 창 200K.</div>
+</div>
+<script id="logic">
+  const WINDOW = 200, BASE = 12, THOUGHT = 1, TOOL = 6, LIMIT = 0.7 * WINDOW, SUMMARY = 10, KEEP = 3, SUB_RETURN = 1.5;
+  function simulateParts(strategy, steps) {
+    const out = [];
+    let summary = 0, recent = [];
+    for (let s = 0; s <= steps; s++) {
+      if (s > 0) recent.push(strategy === "subagent" ? SUB_RETURN : THOUGHT + TOOL);
+      let total = BASE + summary + recent.reduce((a, b) => a + b, 0);
+      if (strategy !== "naive" && total > LIMIT) {        // compaction: 오래된 단계를 요약 노트로
+        summary = SUMMARY;
+        recent = recent.slice(-KEEP);
+        total = BASE + summary + recent.reduce((a, b) => a + b, 0);
+      }
+      out.push({ base: BASE, summary, recent: total - BASE - summary, total });
+    }
+    return out;
+  }
+  function simulate(strategy, steps) { return simulateParts(strategy, steps).map(p => p.total); }
+</script>
+<script>
+  const STRATS = {
+    naive: {name: "그대로 쌓기", color: "var(--bad)",
+      cap: "툴 결과를 전부 쌓으면 27단계쯤 창(200K)을 넘김. 그 전부터도 길수록 성능이 떨어짐(context rot)."},
+    compact: {name: "압축 (compaction)", color: "var(--warn)",
+      cap: "70%를 넘으면 오래된 단계를 짧은 요약 노트로 바꿈. 창 안에 머물지만, 요약하면서 세부가 사라질 수 있음."},
+    subagent: {name: "서브에이전트", color: "var(--good)",
+      cap: "툴을 많이 부르는 일은 서브에이전트가 자기 context에서 하고, 메인에는 짧은 결과만 돌려줌 → 메인이 천천히 자람."},
+  };
+  let cur = "naive";
+  const seg = document.getElementById("seg"), svg = document.getElementById("plot"), slider = document.getElementById("step");
+  seg.innerHTML = Object.entries(STRATS).map(([k, v]) => `<button data-k="${k}">${v.name}</button>`).join("");
+  seg.onclick = e => { if (e.target.dataset.k) { cur = e.target.dataset.k; draw(); } };
+  const X = s => 50 + s / 40 * 500, Y = v => 220 - Math.min(v, 300) / 300 * 200;
+  function draw() {
+    const step = +slider.value;
+    document.getElementById("sv").textContent = step;
+    [...seg.children].forEach(b => b.classList.toggle("on", b.dataset.k === cur));
+    const lines = Object.entries(STRATS).map(([k, v]) => {
+      const pts = simulate(k, 40).map((t, s) => `${s ? "L" : "M"}${X(s)},${Y(t)}`).join("");
+      return `<path d="${pts}" fill="none" stroke="${v.color}" stroke-width="${k === cur ? 3 : 1.2}" opacity="${k === cur ? 1 : 0.35}"/>`;
+    }).join("");
+    const p = simulateParts(cur, 40)[step], H = v => Math.min(v, 300) / 300 * 200;
+    let y = 220;
+    const stack = [["base", "var(--muted)", "고정"], ["summary", "var(--warn)", "요약"], ["recent", "var(--accent)", "쌓인 기록"]].map(([key, color, label]) => {
+      const h = H(p[key]); y -= h;
+      return h > 0 ? `<rect x="600" y="${y}" width="50" height="${h}" fill="${color}" opacity=".85"/>` +
+        (h > 14 ? `<text x="658" y="${y + h / 2 + 4}" font-size="11" fill="var(--muted)">${label}</text>` : "") : "";
+    }).join("");
+    svg.innerHTML = `
+      <rect x="50" y="${Y(WINDOW * 1.5)}" width="500" height="${Y(WINDOW * 0.5) - Y(WINDOW * 1.5)}" fill="var(--bad)" opacity=".06"/>
+      <line x1="50" y1="${Y(WINDOW)}" x2="560" y2="${Y(WINDOW)}" stroke="var(--bad)" stroke-dasharray="5 4"/>
+      <text x="555" y="${Y(WINDOW) - 6}" text-anchor="end" font-size="12" fill="var(--bad)">창 200K</text>
+      <text x="56" y="${Y(WINDOW * 0.5) - 6}" font-size="11" fill="var(--muted)">길수록 성능 저하 (context rot)</text>
+      <line x1="50" y1="220" x2="550" y2="220" stroke="var(--line)"/><line x1="50" y1="20" x2="50" y2="220" stroke="var(--line)"/>
+      <text x="550" y="240" text-anchor="end" font-size="12" fill="var(--muted)">에이전트 단계 →</text>
+      <text x="44" y="24" text-anchor="end" font-size="11" fill="var(--muted)">300K</text>
+      <text x="44" y="224" text-anchor="end" font-size="11" fill="var(--muted)">0</text>
+      ${lines}
+      <line x1="${X(step)}" y1="20" x2="${X(step)}" y2="220" stroke="var(--fg)" opacity=".5"/>
+      ${stack}
+      <text x="625" y="240" text-anchor="middle" font-size="12" fill="var(--fg)">${Math.round(p.total)}K</text>`;
+    document.getElementById("cap").innerHTML = `<b style="color:${STRATS[cur].color}">${STRATS[cur].name}</b> — ${STRATS[cur].cap}`;
+  }
+  slider.addEventListener("input", draw);
+  draw();
+</script>
+</body>
+</html>
